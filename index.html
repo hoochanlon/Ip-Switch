@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IP 配置管理器</title>
+  </head>
+  <body>
+    <div id="app">
+      <div class="container">
+        <div class="header">
+          <div class="app-title">
+            <img class="app-logo" src="/imgs/ico/logo.png" alt="IP Switch" />
+            <h1>IP 配置管理器</h1>
+          </div>
+          
+          <!-- 状态指示器 -->
+          <div id="status-indicator" class="status-indicator">
+            <div class="status-item">
+              <span id="network-status-indicator" class="status-badge status-online">在线</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">场景模式:</span>
+              <span id="scene-status-indicator" class="status-badge">未应用</span>
+            </div>
+            <div class="status-item" id="restore-scene-item" style="display: none;">
+              <button id="restore-scene-btn" class="btn btn-sm btn-ghost">
+                <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
+                解除场景
+              </button>
+            </div>
+          </div>
+          
+          <div class="header-actions">
+            <div class="view-mode-toggle">
+              <label class="radio-label">
+                <input type="radio" name="view-mode" value="simple" id="view-mode-simple" checked onchange="switchViewMode()">
+                <span>简约模式</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="view-mode" value="full" id="view-mode-full" onchange="switchViewMode()">
+                <span>完全模式</span>
+              </label>
+            </div>
+            <button id="refresh-btn" class="btn btn-ghost">
+              <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
+              刷新
+            </button>
+            <button id="about-btn" class="btn btn-ghost">
+              <img class="btn-icon" src="/imgs/svg/common/info.svg" alt="" />
+              关于
+            </button>
+          </div>
+        </div>
+        
+        <div class="main-content">
+          <div class="network-section">
+            <h2 class="section-title">
+              <img class="section-icon" src="/imgs/svg/status/status.svg" alt="" />
+              网络状态
+            </h2>
+            <div id="network-info"></div>
+          </div>
+          
+          <div class="sidebar">
+            <div class="scenes-section">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <img class="section-icon" src="/imgs/svg/common/office.svg" alt="" />
+                  场景管理
+                </h2>
+                <div class="section-actions">
+                  <button id="create-scene-btn" class="btn btn-sm btn-ghost">
+                    <img class="btn-icon" src="/imgs/svg/common/new.svg" alt="" />
+                    新建
+                  </button>
+                  <button id="export-scenes-btn" class="btn btn-sm btn-ghost">
+                    <img class="btn-icon" src="/imgs/svg/common/export.svg" alt="" />
+                    导出
+                  </button>
+                  <button id="import-scenes-btn" class="btn btn-sm btn-ghost">
+                    <img class="btn-icon" src="/imgs/svg/common/import.svg" alt="" />
+                    导入
+                  </button>
+                </div>
+              </div>
+              <div id="scenes-list"></div>
+            </div>
+            
+            <div class="config-section">
+              <h2 class="section-title">
+                <img class="section-icon" src="/imgs/svg/common/setting.svg" alt="" />
+                配置工具
+              </h2>
+              <div class="config-actions">
+                <button id="edit-hosts-btn" class="btn btn-ghost btn-block">
+                  <img class="btn-icon" src="/imgs/svg/status/hosts.svg" alt="" />
+                  编辑 Hosts
+                </button>
+                <button id="edit-proxy-btn" class="btn btn-ghost btn-block">
+                  <img class="btn-icon" src="/imgs/svg/status/proxy.svg" alt="" />
+                  编辑代理
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 关于对话框 -->
+    <div id="about-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>关于 IP 配置管理器</h2>
+          <button class="modal-close" onclick="closeAboutModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h3 style="color: #667eea; margin-bottom: 10px;">IP 配置管理器</h3>
+            <p style="color: #718096; margin-bottom: 5px;">版本: 1.0.0</p>
+            <p style="color: #718096; font-size: 14px;">一个便捷的 IP、Hosts、代理配置管理工具</p>
+          </div>
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
+            <p style="margin-bottom: 15px; color: #4a5568;">
+              <strong>项目地址：</strong>
+            </p>
+            <a href="https://github.com/hoochanlon/IP-Switch" 
+               target="_blank" 
+               style="color: #667eea; text-decoration: none; word-break: break-all; display: block; padding: 10px; background: #f7fafc; border-radius: 6px; margin-bottom: 15px;">
+              https://github.com/hoochanlon/IP-Switch
+            </a>
+            <p style="color: #718096; font-size: 13px; line-height: 1.6;">
+              本项目基于 Tauri 2.0 构建，提供了便捷的网络配置管理功能，包括静态 IP 配置、DHCP 设置、Hosts 文件编辑和代理配置等。
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick="closeAboutModal()">确定</button>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

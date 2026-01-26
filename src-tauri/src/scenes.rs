@@ -1,0 +1,404 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Scene {
+    pub name: String,
+    pub network_configs: HashMap<String, NetworkConfig>,
+    pub hosts_content: Option<String>,
+    pub proxy_config: Option<ProxyConfig>,
+    #[serde(default)]
+    pub tray_color: Option<String>, // 托盘图标颜色（十六进制，如 "#3366FF"）
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkConfig {
+    pub is_dhcp: bool,
+    pub ip: Option<String>,
+    pub subnet: Option<String>,
+    pub gateway: Option<String>,
+    pub dns: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProxyConfig {
+    pub enabled: bool,
+    pub server: String,
+    pub bypass: Vec<String>,
+}
+
+fn get_scenes_dir() -> PathBuf {
+    let mut path = std::env::current_exe()
+        .unwrap_or_else(|_| PathBuf::from("."));
+    path.pop();
+    path.push("scenes");
+    path
+}
+
+fn ensure_scenes_dir() -> Result<PathBuf, String> {
+    let dir = get_scenes_dir();
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("创建场景目录失败: {}", e))?;
+    Ok(dir)
+}
+
+#[tauri::command]
+pub async fn get_scenes() -> Result<Vec<Scene>, String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let mut scenes = Vec::new();
+
+    let entries = fs::read_dir(&scenes_dir)
+        .map_err(|e| format!("读取场景目录失败: {}", e))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取场景文件失败: {}", e))?;
+        let path = entry.path();
+        
+        if path.extension().and_then(|s| s.to_str()) == Some("json") {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(scene) = serde_json::from_str::<Scene>(&content) {
+                    scenes.push(scene);
+                }
+            }
+        }
+    }
+
+    Ok(scenes)
+}
+
+#[tauri::command]
+pub async fn save_scene(scene_name: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    
+    // 获取当前网络配置
+    use crate::network::get_network_info;
+    let adapters = get_network_info().await?;
+    
+    let mut network_configs = HashMap::new();
+    for adapter in adapters {
+        network_configs.insert(adapter.name.clone(), NetworkConfig {
+            is_dhcp: adapter.is_dhcp,
+            ip: adapter.ip_address.clone(),
+            subnet: adapter.subnet_mask.clone(),
+            gateway: adapter.gateway.clone(),
+            dns: adapter.dns_servers.clone(),
+        });
+    }
+    
+    // 获取当前Hosts内容
+    use crate::hosts::get_hosts;
+    let hosts_content = get_hosts().await.ok();
+    
+    // 获取当前代理配置
+    use crate::proxy::get_proxy;
+    let proxy_config = get_proxy().await.ok().map(|p| ProxyConfig {
+        enabled: p.enabled,
+        server: p.server,
+        bypass: p.bypass,
+    });
+    
+    let scene = Scene {
+        name: scene_name.clone(),
+        network_configs,
+        hosts_content,
+        proxy_config,
+        tray_color: None, // 保存场景时默认不设置托盘颜色
+    };
+    
+    let scene_file = scenes_dir.join(format!("{}.json", scene_name));
+    let content = serde_json::to_string_pretty(&scene)
+        .map_err(|e| format!("序列化场景失败: {}", e))?;
+    
+    fs::write(&scene_file, content)
+        .map_err(|e| format!("保存场景失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 保存当前配置为备份（在应用场景前调用）
+#[tauri::command]
+pub async fn save_backup() -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    
+    // 获取当前网络配置
+    use crate::network::get_network_info;
+    let adapters = get_network_info().await?;
+    
+    let mut network_configs = HashMap::new();
+    for adapter in adapters {
+        network_configs.insert(adapter.name.clone(), NetworkConfig {
+            is_dhcp: adapter.is_dhcp,
+            ip: adapter.ip_address.clone(),
+            subnet: adapter.subnet_mask.clone(),
+            gateway: adapter.gateway.clone(),
+            dns: adapter.dns_servers.clone(),
+        });
+    }
+    
+    // 获取当前Hosts内容
+    use crate::hosts::get_hosts;
+    let hosts_content = get_hosts().await.ok();
+    
+    // 获取当前代理配置
+    use crate::proxy::get_proxy;
+    let proxy_config = get_proxy().await.ok().map(|p| ProxyConfig {
+        enabled: p.enabled,
+        server: p.server,
+        bypass: p.bypass,
+    });
+    
+    let backup = Scene {
+        name: "_backup_before_scene".to_string(),
+        network_configs,
+        hosts_content,
+        proxy_config,
+        tray_color: None,
+    };
+    
+    let backup_file = scenes_dir.join("_backup_before_scene.json");
+    let content = serde_json::to_string_pretty(&backup)
+        .map_err(|e| format!("序列化备份失败: {}", e))?;
+    
+    fs::write(&backup_file, content)
+        .map_err(|e| format!("保存备份失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 恢复备份配置（解除场景）
+#[tauri::command]
+pub async fn restore_backup() -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let backup_file = scenes_dir.join("_backup_before_scene.json");
+    
+    if !backup_file.exists() {
+        return Err("没有找到备份配置".to_string());
+    }
+    
+    let content = fs::read_to_string(&backup_file)
+        .map_err(|e| format!("读取备份文件失败: {}", e))?;
+    
+    let backup: Scene = serde_json::from_str(&content)
+        .map_err(|e| format!("解析备份文件失败: {}", e))?;
+    
+    // 恢复网络配置
+    use crate::network::{set_static_ip, set_dhcp};
+    for (adapter_name, config) in backup.network_configs {
+        if config.is_dhcp {
+            set_dhcp(adapter_name).await?;
+        } else if let (Some(ip), Some(subnet), Some(gateway)) = (config.ip, config.subnet, config.gateway) {
+            set_static_ip(
+                adapter_name,
+                ip,
+                subnet,
+                gateway,
+                config.dns.unwrap_or_default(),
+            ).await?;
+        }
+    }
+    
+    // 恢复Hosts配置
+    if let Some(hosts_content) = backup.hosts_content {
+        use crate::hosts::set_hosts;
+        set_hosts(hosts_content).await?;
+    }
+    
+    // 恢复代理配置
+    if let Some(proxy_config) = backup.proxy_config {
+        use crate::proxy::set_proxy;
+        set_proxy(
+            proxy_config.enabled,
+            proxy_config.server,
+            proxy_config.bypass,
+        ).await?;
+    }
+    
+    Ok(())
+}
+
+/// 检查是否存在备份
+#[tauri::command]
+pub async fn has_backup() -> Result<bool, String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let backup_file = scenes_dir.join("_backup_before_scene.json");
+    Ok(backup_file.exists())
+}
+
+#[tauri::command]
+pub async fn apply_scene(scene_name: String) -> Result<(), String> {
+    // 在应用场景前，先保存当前配置为备份
+    save_backup().await?;
+    
+    let scenes_dir = ensure_scenes_dir()?;
+    let scene_file = scenes_dir.join(format!("{}.json", scene_name));
+    
+    let content = fs::read_to_string(&scene_file)
+        .map_err(|e| format!("读取场景文件失败: {}", e))?;
+    
+    let scene: Scene = serde_json::from_str(&content)
+        .map_err(|e| format!("解析场景文件失败: {}", e))?;
+    
+    // 应用网络配置
+    use crate::network::{set_static_ip, set_dhcp};
+    for (adapter_name, config) in scene.network_configs {
+        if config.is_dhcp {
+            set_dhcp(adapter_name).await?;
+        } else if let (Some(ip), Some(subnet), Some(gateway)) = (config.ip, config.subnet, config.gateway) {
+            set_static_ip(
+                adapter_name,
+                ip,
+                subnet,
+                gateway,
+                config.dns.unwrap_or_default(),
+            ).await?;
+        }
+    }
+    
+    // 应用Hosts配置
+    if let Some(hosts_content) = scene.hosts_content {
+        use crate::hosts::set_hosts;
+        set_hosts(hosts_content).await?;
+    }
+    
+    // 应用代理配置
+    if let Some(proxy_config) = scene.proxy_config {
+        use crate::proxy::set_proxy;
+        set_proxy(
+            proxy_config.enabled,
+            proxy_config.server,
+            proxy_config.bypass,
+        ).await?;
+    }
+    
+    // 注意：托盘颜色更新需要在调用 apply_scene 时传入 AppHandle
+    // 这里暂时不处理，由前端调用 update_tray_icon_color
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_scene(
+    scene_name: String,
+    network_configs: HashMap<String, NetworkConfig>,
+    hosts_content: Option<String>,
+    proxy_config: Option<ProxyConfig>,
+    tray_color: Option<String>,
+) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let scene_file = scenes_dir.join(format!("{}.json", scene_name));
+    
+    // 读取现有场景（如果存在）
+    let mut scene = if scene_file.exists() {
+        let content = fs::read_to_string(&scene_file)
+            .map_err(|e| format!("读取场景文件失败: {}", e))?;
+        serde_json::from_str::<Scene>(&content)
+            .map_err(|e| format!("解析场景文件失败: {}", e))?
+    } else {
+        Scene {
+            name: scene_name.clone(),
+            network_configs: HashMap::new(),
+            hosts_content: None,
+            proxy_config: None,
+            tray_color: None,
+        }
+    };
+    
+    // 更新网络配置
+    scene.network_configs = network_configs;
+    
+    // 更新Hosts内容（如果提供）
+    if let Some(hosts) = hosts_content {
+        scene.hosts_content = Some(hosts);
+    }
+    
+    // 更新代理配置（如果提供）
+    if let Some(proxy) = proxy_config {
+        scene.proxy_config = Some(proxy);
+    }
+    
+    // 更新托盘颜色（如果提供）
+    if let Some(color) = tray_color {
+        scene.tray_color = Some(color);
+    }
+    
+    // 保存场景
+    let content = serde_json::to_string_pretty(&scene)
+        .map_err(|e| format!("序列化场景失败: {}", e))?;
+    
+    fs::write(&scene_file, content)
+        .map_err(|e| format!("保存场景失败: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_scene(scene_name: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let scene_file = scenes_dir.join(format!("{}.json", scene_name));
+    
+    fs::remove_file(&scene_file)
+        .map_err(|e| format!("删除场景文件失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 导出所有场景到指定文件（JSON）
+#[tauri::command]
+pub async fn export_scenes(file_path: String) -> Result<(), String> {
+    let scenes = get_scenes().await?;
+    let content = serde_json::to_string_pretty(&scenes)
+        .map_err(|e| format!("序列化场景列表失败: {}", e))?;
+    fs::write(&file_path, content)
+        .map_err(|e| format!("写入导出文件失败: {}", e))?;
+    Ok(())
+}
+
+/// 从指定文件导入场景列表（JSON），会覆盖同名场景
+#[tauri::command]
+pub async fn import_scenes(file_path: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取导入文件失败: {}", e))?;
+    
+    let imported: Vec<Scene> = serde_json::from_str(&content)
+        .map_err(|e| format!("解析导入文件失败: {}", e))?;
+    
+    for scene in imported {
+        let scene_file = scenes_dir.join(format!("{}.json", scene.name));
+        let scene_content = serde_json::to_string_pretty(&scene)
+            .map_err(|e| format!("序列化场景失败: {}", e))?;
+        fs::write(&scene_file, scene_content)
+            .map_err(|e| format!("写入场景文件失败: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+/// 以 JSON 字符串形式导出所有场景（给前端下载用）
+#[tauri::command]
+pub async fn export_scenes_json() -> Result<String, String> {
+    let scenes = get_scenes().await?;
+    let content = serde_json::to_string_pretty(&scenes)
+        .map_err(|e| format!("序列化场景列表失败: {}", e))?;
+    Ok(content)
+}
+
+/// 从 JSON 字符串导入场景列表（给前端上传用），会覆盖同名场景
+#[tauri::command]
+pub async fn import_scenes_json(json: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir()?;
+    let imported: Vec<Scene> = serde_json::from_str(&json)
+        .map_err(|e| format!("解析导入数据失败: {}", e))?;
+    
+    for scene in imported {
+        let scene_file = scenes_dir.join(format!("{}.json", scene.name));
+        let scene_content = serde_json::to_string_pretty(&scene)
+            .map_err(|e| format!("序列化场景失败: {}", e))?;
+        fs::write(&scene_file, scene_content)
+            .map_err(|e| format!("写入场景文件失败: {}", e))?;
+    }
+    
+    Ok(())
+}

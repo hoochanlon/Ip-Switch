@@ -1,0 +1,197 @@
+#network-info {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.network-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 15px;
+  transition: all 0.3s;
+}
+
+.network-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.network-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.network-header h3 {
+  font-size: 16px;
+  color: #2d3748;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.status-badge.enabled {
+  background: #c6f6d5;
+  color: #22543d;
+  position: relative;
+  padding-left: 20px;
+}
+
+.status-badge.enabled::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.status-badge.disabled {
+  background: #fed7d7;
+  color: #742a2a;
+  position: relative;
+  padding-left: 20px;
+}
+
+.status-badge.disabled::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.network-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.detail-row {
+  display: flex;
+  gap: 8px;
+}
+
+.detail-row .label {
+  font-weight: 500;
+  color: #718096;
+  min-width: 80px;
+}
+
+.detail-row .value {
+  color: #2d3748;
+  word-break: break-all;
+}
+
+/* 视图模式切换 */
+.view-mode-toggle {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 8px 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-right: 10px;
+}
+
+.view-mode-toggle .radio-label {
+  margin: 0;
+  padding: 0;
+}
+
+.view-mode-toggle .radio-label:hover {
+  background: transparent;
+}
+
+/* 简约模式卡片样式 */
+.simple-card {
+  margin-bottom: 15px;
+}
+
+.network-details-simple {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* 网络类型徽章 */
+.network-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.network-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+}
+
+.network-type-badge.wifi {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.network-type-badge.ethernet {
+  background: #fff4e6;
+  color: #cc6600;
+}
+
+.network-type-badge.bluetooth {
+  background: #e6f0ff;
+  color: #0066cc;
+}
+
+.network-type-badge.vpn {
+  background: #f0e6ff;
+  color: #6600cc;
+}
+
+.network-type-badge.other {
+  background: #f0f0f0;
+  color: #666666;
+}
+
+.wifi-card {
+  /* WiFi：绿色强调色 */
+  border-left: 4px solid #10b981;
+}
+
+.ethernet-card {
+  border-left: 4px solid #cc6600;
+}
+
+.bluetooth-card {
+  border-left: 4px solid #0066cc;
+}
+
+.vpn-card {
+  border-left: 4px solid #6600cc;
+}
+
+.other-card {
+  border-left: 4px solid #666666;
+}
+

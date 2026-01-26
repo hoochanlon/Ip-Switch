@@ -1,0 +1,72 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Windows
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Tauri
+src-tauri/target
+# Note: Cargo.lock should be committed for applications
+# Uncomment the next line if this is a library
+# src-tauri/Cargo.lock
+
+# Build outputs
+src-tauri/target/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Scenes directory (user data)
+scenes/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

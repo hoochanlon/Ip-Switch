@@ -1,0 +1,24 @@
+@media (max-width: 768px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .network-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    max-width: 100%;
+    margin: 10px;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .status-indicator {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+

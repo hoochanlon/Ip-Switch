@@ -1,0 +1,56 @@
+/* 状态指示器样式 */
+.status-indicator {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  color: #718096;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* .status-badge 已在 network.css 定义，这里删除重复定义 */
+
+.status-online {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.status-offline {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.status-online::before {
+  background: #10b981;
+}
+
+.status-offline::before {
+  background: #ef4444;
+}
+
+.status-scene-active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.status-scene-inactive {
+  background: #f3f4f6;
+  color: #374151;
+}
+

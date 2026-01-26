@@ -1,0 +1,30 @@
+[package]
+name = "ip-switch"
+version = "1.0.0"
+description = "IP、Hosts、代理配置修改器"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+
+[package.metadata.tauri.bundle]
+icon = ["icons/icon.ico"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["tray-icon"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+winreg = "0.50"
+ipconfig = "0.3"
+winapi = { version = "0.3", features = ["wininet"] }
+resvg = "0.42"
+tiny-skia = "0.11"
+ab_glyph = "0.2"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

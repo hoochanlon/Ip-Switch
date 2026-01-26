@@ -1,0 +1,27 @@
+@font-face {
+  font-family: 'OPPOSans';
+  src: url('../../fonts/OPPOSans4.0.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'OPPOSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: #f6f7fb;
+  min-height: 100vh;
+  padding: 18px;
+  color: #111827;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
