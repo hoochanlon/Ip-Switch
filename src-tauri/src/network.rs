@@ -575,6 +575,114 @@ pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Ping测试（Tauri command）
+#[tauri::command]
+pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {
+    // 使用PowerShell的Test-Connection命令进行ping测试
+    let output = Command::new("powershell")
+        .args(&[
+            "-Command",
+            &format!(
+                "$result = Test-Connection -ComputerName '{}' -Count 1 -Quiet -TimeoutSeconds {}; if ($result) {{ Write-Output 'SUCCESS' }} else {{ Write-Output 'FAILED' }}",
+                host.replace("'", "''"),
+                timeout_sec
+            )
+        ])
+        .output()
+        .map_err(|e| format!("执行ping测试失败: {}", e))?;
+    
+    let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(output_str.contains("SUCCESS"))
+}
+
+/// 自动切换网络配置（双向切换）
+#[tauri::command]
+pub async fn auto_switch_network(
+    adapter_name: String,
+    dhcp_config: Option<DhcpConfig>,
+    static_config: Option<StaticConfig>,
+    dhcp_ping_target: String,      // DHCP模式下的ping目标（如baidu.com）
+    static_ping_target: String,    // 静态IP模式下的ping目标（如网关IP）
+) -> Result<String, String> {
+    // 获取当前网络配置
+    let current_info = get_network_info().await?;
+    let adapter = current_info.iter()
+        .find(|a| a.name == adapter_name)
+        .ok_or_else(|| format!("找不到网卡: {}", adapter_name))?;
+    
+    let current_is_dhcp = adapter.is_dhcp;
+    
+    // 根据当前模式进行ping测试和切换
+    if current_is_dhcp {
+        // 当前是DHCP模式，ping外网目标
+        let can_ping = ping_test(dhcp_ping_target.clone(), 3).await.unwrap_or(false);
+        
+        if !can_ping {
+            // 无法ping通外网，切换到静态IP
+            if let Some(static_cfg) = static_config {
+                set_static_ip(
+                    adapter_name.clone(),
+                    static_cfg.ip,
+                    static_cfg.subnet,
+                    static_cfg.gateway,
+                    static_cfg.dns.unwrap_or_default(),
+                ).await?;
+                return Ok(format!("已从DHCP切换到静态IP (无法ping通 {})", dhcp_ping_target));
+            } else {
+                return Err("静态IP配置未提供".to_string());
+            }
+        } else {
+            return Ok("保持DHCP模式 (可以ping通外网)".to_string());
+        }
+    } else {
+        // 当前是静态IP模式，ping内网目标
+        let can_ping = ping_test(static_ping_target.clone(), 3).await.unwrap_or(false);
+        
+        if !can_ping {
+            // 无法ping通内网，切换到DHCP
+            if let Some(dhcp_cfg) = dhcp_config {
+                set_dhcp(adapter_name.clone()).await?;
+                
+                // 如果提供了DHCP的DNS配置，设置DNS
+                if let Some(dns) = dhcp_cfg.dns {
+                    if !dns.is_empty() {
+                        let dns_str = dns.join(",");
+                        let _ = Command::new("powershell")
+                            .args(&[
+                                "-Command",
+                                &format!(
+                                    "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {} -ErrorAction SilentlyContinue",
+                                    adapter_name.replace("'", "''"),
+                                    dns_str.replace("'", "''")
+                                )
+                            ])
+                            .output();
+                    }
+                }
+                
+                return Ok(format!("已从静态IP切换到DHCP (无法ping通 {})", static_ping_target));
+            } else {
+                return Err("DHCP配置未提供".to_string());
+            }
+        } else {
+            return Ok("保持静态IP模式 (可以ping通内网)".to_string());
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DhcpConfig {
+    pub dns: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StaticConfig {
+    pub ip: String,
+    pub subnet: String,
+    pub gateway: String,
+    pub dns: Option<Vec<String>>,
+}
+
 fn subnet_to_prefix(subnet: &str) -> Result<u8, String> {
     let parts: Vec<&str> = subnet.split('.').collect();
     if parts.len() != 4 {

@@ -87,15 +87,16 @@ fn main() {
 
             // 生成自定义托盘图标（方形，包含 "IP" 文字）
             // 使用微信大小的图标（32x32 像素）
+            // 默认蓝色背景 (#3366FF = RGB(0.2, 0.4, 1.0))
             let icon = TrayIconGenerator::new()
                 .with_size(32)
-                .with_background_color(0.2, 0.5, 0.9, 1.0) // 蓝色背景
+                .with_background_color(0.2, 0.4, 1.0, 1.0) // 蓝色背景 (#3366FF)
                 .with_text_color(1.0, 1.0, 1.0, 1.0)      // 白色文字
                 .generate()
                 .unwrap_or_else(|e| {
                     eprintln!("Failed to generate tray icon: {}, using fallback", e);
                     // 如果生成失败，使用备用方法
-                    load_tray_icon(app.handle(), "#FFFFFF")
+                    load_tray_icon(app.handle(), "#3366FF")
                 });
 
             let tray_icon = TrayIconBuilder::new()
@@ -188,6 +189,8 @@ fn main() {
             has_backup,
             check_admin_privileges,
             request_admin_privileges,
+            network::ping_test,
+            network::auto_switch_network,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
