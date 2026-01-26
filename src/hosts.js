@@ -46,14 +46,13 @@ function showHostsEditor(content) {
                    value="${escapeHtml(savedUrl)}" 
                    placeholder="${escapeHtml(DEFAULT_HOSTS_URL)}"
                    style="flex: 1; min-width: 300px;">
-            <button id="hosts-update-btn" class="btn btn-sm btn-ghost" onclick="window.updateHostsFromRemote()" 
-                    title="从远程URL更新hosts内容（追加到当前内容末尾）">
+            <button id="hosts-update-btn" class="btn btn-sm btn-ghost" onclick="window.updateHostsFromRemote()">
               <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
               更新
             </button>
           </div>
           <div class="hosts-scheduled-update-group" style="margin-top: 8px;">
-            <label class="checkbox-label" title="每天9:00和17:00定时从远程更新hosts">
+            <label class="checkbox-label">
               <input type="checkbox" id="hosts-scheduled-update-checkbox" ${scheduledUpdateConfig.enabled ? 'checked' : ''}>
               <span>定时更新（每天9:00、17:00）</span>
             </label>

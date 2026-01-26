@@ -133,12 +133,7 @@ img[class*="logo"] {
 }
 
 /* 深色模式下网络图标优化 */
-[data-theme="dark"] .network-icon,
-[data-theme="dark"] .network-icon-small {
-  /* 网络图标通常有颜色，根据实际情况调整 */
-  filter: invert(1) brightness(1.1);
-  opacity: 0.9;
-}
+/* 注意：WiFi、以太网、VPN、蓝牙等网络状态图标不需要夜间模式白色优化 */
 
 /* 深色模式下状态图标优化（保持原有颜色，只调整亮度） */
 [data-theme="dark"] .btn-icon[src*="hosts.svg"],
