@@ -9,6 +9,7 @@ import { editHosts } from './hosts.js';
 import { editProxy } from './proxy.js';
 import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAboutModal } from './ui.js';
 import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
+import { initHostsScheduledUpdate } from './hosts.js';
 
 // 初始化
 async function init() {
@@ -60,6 +61,9 @@ async function init() {
   
   // 初始化自动切换功能
   initAutoSwitch();
+  
+  // 初始化hosts定时更新功能
+  initHostsScheduledUpdate();
 }
 
 // 初始化网络状态检测

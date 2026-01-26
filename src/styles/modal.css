@@ -242,11 +242,12 @@
 }
 
 .checkbox-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -254,6 +255,15 @@
   height: 18px;
   cursor: pointer;
   accent-color: #667eea;
+  margin: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.checkbox-label span {
+  line-height: 1;
+  display: inline;
+  vertical-align: middle;
 }
 
 /* 单选按钮组 */

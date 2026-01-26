@@ -2,7 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import * as state from './state.js';
-import { refreshNetworkInfo } from './network.js';
+import { refreshNetworkInfo, getNetworkTypeInfo } from './network.js';
 import { renderScenes } from './scenes.js';
 
 // 自动切换配置
@@ -168,6 +168,37 @@ async function performAutoSwitch() {
     
     console.log('自动切换结果:', result);
     
+    // 根据切换结果更新托盘颜色
+    if (result.includes('异常') || result.includes('都无法ping通')) {
+      // 双方都ping不通的异常情况，使用红色提示
+      const errorColor = '#FF0000';
+      try {
+        await invoke('update_tray_icon_color', { hexColor: errorColor });
+        state.setLastTrayColor(errorColor);
+        console.warn('网络异常：双方都无法ping通，保持当前模式');
+      } catch (error) {
+        console.warn('更新托盘图标颜色失败:', error);
+      }
+    } else if (result.includes('DHCP') || result.includes('保持DHCP')) {
+      // 切换到或保持DHCP模式（外网），使用外网托盘颜色
+      const dhcpColor = autoSwitchConfig.dhcpTrayColor || '#00FF00';
+      try {
+        await invoke('update_tray_icon_color', { hexColor: dhcpColor });
+        state.setLastTrayColor(dhcpColor);
+      } catch (error) {
+        console.warn('更新托盘图标颜色失败:', error);
+      }
+    } else if (result.includes('静态IP') || result.includes('切换到静态IP')) {
+      // 切换到静态IP模式（内网），使用内网托盘颜色
+      const staticColor = autoSwitchConfig.staticTrayColor || '#FFA500';
+      try {
+        await invoke('update_tray_icon_color', { hexColor: staticColor });
+        state.setLastTrayColor(staticColor);
+      } catch (error) {
+        console.warn('更新托盘图标颜色失败:', error);
+      }
+    }
+    
     // 刷新网络信息
     await refreshNetworkInfo();
   } catch (error) {
@@ -232,33 +263,40 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
   const checkboxStateBeforeOpen = fromCheckbox ? 
     (document.getElementById('auto-switch-checkbox')?.checked || false) : null;
   
-  // 获取以太网适配器
-  const ethernetAdapters = state.currentNetworkInfo?.filter(adapter => {
+  // 获取主要网卡（WiFi和以太网，排除虚拟网卡和蓝牙）
+  const mainAdapters = state.currentNetworkInfo?.filter(adapter => {
     const name = adapter.name.toLowerCase();
     const networkType = (adapter.network_type || '').toLowerCase();
     
-    const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
-    const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
-    const isBluetooth = networkType === 'bluetooth' || name.includes('bluetooth');
-    
-    if (isVirtual || isBluetooth) {
+    if (networkType === 'bluetooth' || name.includes('bluetooth')) {
       return false;
     }
     
-    return networkType === 'ethernet' || (!adapter.is_wireless && (
+    const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+    const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
+    
+    if (isVirtual) {
+      return false;
+    }
+    
+    const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
+    const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
       name.includes('ethernet') || 
       name.includes('以太网') ||
       (name.includes('lan') && !isVirtual && !name.includes('wlan'))
     ));
+    
+    return (isWifi || isEthernet) && !isVirtual;
   }) || [];
   
-  const adapterOptions = ethernetAdapters.map(adapter => 
-    `<option value="${adapter.name}">${adapter.name}</option>`
-  ).join('');
+  const adapterOptions = mainAdapters.map(adapter => {
+    const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
+    return `<option value="${adapter.name}">${adapter.name} (${typeInfo.label})</option>`;
+  }).join('');
   
   const currentConfig = autoSwitchConfig || {
     enabled: false,
-    adapterName: ethernetAdapters[0]?.name || '',
+    adapterName: mainAdapters[0]?.name || '',
     dhcpConfig: {
       dns: ['192.168.1.250', '114.114.114.114']
     },
@@ -269,7 +307,9 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
       dns: ['172.16.1.6']
     },
     dhcpPingTarget: 'baidu.com',
-    staticPingTarget: '172.16.1.254'
+    staticPingTarget: '172.16.1.254',
+    dhcpTrayColor: '#00FF00', // 外网托盘颜色（绿色）
+    staticTrayColor: '#FFA500' // 内网托盘颜色（橙色）
   };
   
   modal.innerHTML = `
@@ -287,7 +327,7 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
         </div>
         
         <div class="form-group">
-          <label for="auto-switch-adapter">以太网适配器:</label>
+          <label for="auto-switch-adapter">网络适配器:</label>
           <select id="auto-switch-adapter" class="form-input">
             ${adapterOptions}
           </select>
@@ -306,6 +346,19 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
                    value="${currentConfig.dhcpPingTarget || 'baidu.com'}"
                    placeholder="baidu.com">
             <small class="form-hint">如果无法ping通此目标，将切换到静态IP</small>
+          </div>
+          <div class="form-group">
+            <label for="dhcp-tray-color">托盘图标颜色（外网）:</label>
+            <div class="color-picker-container">
+              <input type="color" id="dhcp-tray-color-picker" 
+                     value="${currentConfig.dhcpTrayColor || '#00FF00'}">
+              <input type="text" id="dhcp-tray-color" class="form-input" 
+                     placeholder="#00FF00" 
+                     value="${currentConfig.dhcpTrayColor || '#00FF00'}"
+                     pattern="^#[0-9A-Fa-f]{6}$"
+                     onchange="window.updateTrayColorPreview('dhcp')">
+            </div>
+            <small class="form-hint">支持十六进制颜色格式，例如: #00FF00（绿色）</small>
           </div>
         </div>
         
@@ -337,6 +390,19 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
                    value="${currentConfig.staticPingTarget || '172.16.1.254'}"
                    placeholder="172.16.1.254">
             <small class="form-hint">如果无法ping通此目标，将切换到DHCP</small>
+          </div>
+          <div class="form-group">
+            <label for="static-tray-color">托盘图标颜色（内网）:</label>
+            <div class="color-picker-container">
+              <input type="color" id="static-tray-color-picker" 
+                     value="${currentConfig.staticTrayColor || '#FFA500'}">
+              <input type="text" id="static-tray-color" class="form-input" 
+                     placeholder="#FFA500" 
+                     value="${currentConfig.staticTrayColor || '#FFA500'}"
+                     pattern="^#[0-9A-Fa-f]{6}$"
+                     onchange="window.updateTrayColorPreview('static')">
+            </div>
+            <small class="form-hint">支持十六进制颜色格式，例如: #FFA500（橙色）</small>
           </div>
         </div>
       </div>
@@ -396,6 +462,18 @@ window.cancelAutoSwitchConfig = function(fromCheckbox, checkboxStateBeforeOpen) 
   }
 };
 
+// 更新托盘颜色预览
+window.updateTrayColorPreview = function(type) {
+  const colorInput = document.getElementById(`${type}-tray-color`);
+  const colorPicker = document.getElementById(`${type}-tray-color-picker`);
+  if (colorInput && colorPicker) {
+    const value = colorInput.value.trim();
+    if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+      colorPicker.value = value;
+    }
+  }
+};
+
 // 保存自动切换配置
 window.saveAutoSwitchConfig = function() {
   const enabled = document.getElementById('auto-switch-enabled').checked;
@@ -408,8 +486,16 @@ window.saveAutoSwitchConfig = function() {
   const staticDns = document.getElementById('static-dns').value.trim();
   const staticPing = document.getElementById('static-ping').value.trim();
   
+  // 获取托盘颜色
+  const dhcpTrayColorInput = document.getElementById('dhcp-tray-color');
+  const staticTrayColorInput = document.getElementById('static-tray-color');
+  const dhcpTrayColor = dhcpTrayColorInput ? dhcpTrayColorInput.value.trim() : '';
+  const staticTrayColor = staticTrayColorInput ? staticTrayColorInput.value.trim() : '';
+  const validDhcpTrayColor = dhcpTrayColor && /^#[0-9A-Fa-f]{6}$/.test(dhcpTrayColor) ? dhcpTrayColor : '#00FF00';
+  const validStaticTrayColor = staticTrayColor && /^#[0-9A-Fa-f]{6}$/.test(staticTrayColor) ? staticTrayColor : '#FFA500';
+  
   if (!adapterName) {
-    alert('请选择以太网适配器');
+    alert('请选择网络适配器');
     return;
   }
   
@@ -431,7 +517,9 @@ window.saveAutoSwitchConfig = function() {
       dns: staticDns ? staticDns.split(',').map(s => s.trim()).filter(s => s) : []
     },
     dhcpPingTarget: dhcpPing,
-    staticPingTarget: staticPing
+    staticPingTarget: staticPing,
+    dhcpTrayColor: validDhcpTrayColor,
+    staticTrayColor: validStaticTrayColor
   };
   
   setAutoSwitchConfig(config);
