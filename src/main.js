@@ -100,18 +100,6 @@ async function updateStatusIndicator() {
       sceneIndicator.className = 'status-badge status-scene-inactive';
     }
   }
-  
-  // 检查是否有备份，显示/隐藏解除场景按钮
-  const restoreItem = document.getElementById('restore-scene-item');
-  if (restoreItem) {
-    try {
-      const hasBackup = await invoke('has_backup');
-      restoreItem.style.display = hasBackup ? 'flex' : 'none';
-    } catch (error) {
-      console.error('检查备份状态失败:', error);
-      restoreItem.style.display = 'none';
-    }
-  }
 }
 
 // 更新网络状态 UI（保持向后兼容）
@@ -134,14 +122,14 @@ async function loadScenes() {
       }
     }
     
-    renderScenes();
+    await renderScenes();
   } catch (error) {
     console.error('加载场景失败:', error);
   }
 }
 
 // 渲染场景列表
-function renderScenes() {
+async function renderScenes() {
   const container = document.getElementById('scenes-list');
   container.innerHTML = '';
   
@@ -150,11 +138,41 @@ function renderScenes() {
     return;
   }
   
-  scenes.forEach((scene) => {
+  // 检查是否有备份（仅当有当前场景时）
+  let hasBackup = false;
+  if (currentScene) {
+    try {
+      hasBackup = await invoke('has_backup');
+    } catch (error) {
+      console.error('检查备份状态失败:', error);
+    }
+  }
+  
+  for (const scene of scenes) {
     const item = document.createElement('div');
     item.className = `scene-item ${currentScene === scene.name ? 'active' : ''}`;
     
     const networkCount = scene.network_configs ? Object.keys(scene.network_configs).length : 0;
+    const isCurrentScene = currentScene === scene.name;
+    
+    // 构建操作按钮
+    let actionButtons = '';
+    if (isCurrentScene && hasBackup) {
+      // 如果是当前应用场景且有备份，同时显示"应用"和"解除"按钮
+      actionButtons = `
+        <button class="btn btn-sm" onclick="applyScene('${scene.name}')">应用</button>
+        <button class="btn btn-sm btn-ghost" onclick="restoreScene()">解除</button>
+        <button class="btn btn-sm" onclick="editScene('${scene.name}')">编辑</button>
+        <button class="btn btn-sm" onclick="deleteScene('${scene.name}')">删除</button>
+      `;
+    } else {
+      // 普通场景，显示"应用"按钮
+      actionButtons = `
+        <button class="btn btn-sm" onclick="applyScene('${scene.name}')">应用</button>
+        <button class="btn btn-sm" onclick="editScene('${scene.name}')">编辑</button>
+        <button class="btn btn-sm" onclick="deleteScene('${scene.name}')">删除</button>
+      `;
+    }
     
     item.innerHTML = `
       <div class="scene-info">
@@ -162,13 +180,11 @@ function renderScenes() {
         <span class="scene-details">${networkCount} 个网卡</span>
       </div>
       <div class="scene-actions">
-        <button class="btn btn-sm" onclick="applyScene('${scene.name}')">应用</button>
-        <button class="btn btn-sm" onclick="editScene('${scene.name}')">编辑</button>
-        <button class="btn btn-sm" onclick="deleteScene('${scene.name}')">删除</button>
+        ${actionButtons}
       </div>
     `;
     container.appendChild(item);
-  });
+  }
 }
 
 // 切换视图模式
@@ -1002,8 +1018,8 @@ window.applyScene = async function(sceneName) {
     currentScene = sceneName;
     // 持久化当前场景到本地存储
     localStorage.setItem('currentScene', sceneName);
-    renderScenes();
-    await updateStatusIndicator(); // 更新状态指示器（异步检查备份）
+    await renderScenes();
+    await updateStatusIndicator(); // 更新状态指示器
     await refreshNetworkInfo();
     alert('场景已应用');
   } catch (error) {
@@ -1078,9 +1094,33 @@ window.deleteScene = async function(sceneName) {
       localStorage.removeItem('currentScene');
     }
     await loadScenes();
-    await updateStatusIndicator(); // 更新状态指示器（异步检查备份）
+    await updateStatusIndicator(); // 更新状态指示器
   } catch (error) {
     alert('删除场景失败: ' + error);
+  }
+};
+
+// 清空所有场景
+window.clearScenes = async function() {
+  if (!confirm('确定要清空所有场景吗？此操作不可恢复！')) {
+    return;
+  }
+  
+  try {
+    // 删除所有场景
+    for (const scene of scenes) {
+      await invoke('delete_scene', { sceneName: scene.name });
+    }
+    
+    // 清除当前场景状态
+    currentScene = null;
+    localStorage.removeItem('currentScene');
+    
+    await loadScenes();
+    await updateStatusIndicator();
+    alert('所有场景已清空');
+  } catch (error) {
+    alert('清空场景失败: ' + error);
   }
 };
 
@@ -1100,8 +1140,8 @@ window.restoreScene = async function() {
     // 恢复托盘颜色（如果有默认颜色，可以在这里设置）
     // 暂时不处理，保持当前托盘颜色
     
-    renderScenes();
-    await updateStatusIndicator(); // 更新状态指示器（异步检查备份）
+    await renderScenes();
+    await updateStatusIndicator(); // 更新状态指示器
     await refreshNetworkInfo();
     alert('场景已解除，配置已恢复');
   } catch (error) {
@@ -1119,9 +1159,9 @@ function setupEventListeners() {
   document.getElementById('edit-hosts-btn').addEventListener('click', window.editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', window.editProxy);
   
-  const restoreBtn = document.getElementById('restore-scene-btn');
-  if (restoreBtn) {
-    restoreBtn.addEventListener('click', window.restoreScene);
+  const clearBtn = document.getElementById('clear-scenes-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', window.clearScenes);
   }
   
   const exportBtn = document.getElementById('export-scenes-btn');

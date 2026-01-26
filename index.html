@@ -24,12 +24,6 @@
               <span class="status-label">场景模式:</span>
               <span id="scene-status-indicator" class="status-badge">未应用</span>
             </div>
-            <div class="status-item" id="restore-scene-item" style="display: none;">
-              <button id="restore-scene-btn" class="btn btn-sm btn-ghost">
-                <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
-                解除场景
-              </button>
-            </div>
           </div>
           
           <div class="header-actions">
@@ -46,6 +40,14 @@
             <button id="refresh-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
               刷新
+            </button>
+            <button id="edit-hosts-btn" class="btn btn-ghost">
+              <img class="btn-icon" src="/imgs/svg/status/hosts.svg" alt="" />
+              编辑 Hosts
+            </button>
+            <button id="edit-proxy-btn" class="btn btn-ghost">
+              <img class="btn-icon" src="/imgs/svg/status/proxy.svg" alt="" />
+              编辑代理
             </button>
             <button id="about-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/common/info.svg" alt="" />
@@ -68,12 +70,16 @@
               <div class="section-header">
                 <h2 class="section-title">
                   <img class="section-icon" src="/imgs/svg/common/office.svg" alt="" />
-                  场景管理
+                  网卡场景管理
                 </h2>
                 <div class="section-actions">
                   <button id="create-scene-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/new.svg" alt="" />
                     新建
+                  </button>
+                  <button id="clear-scenes-btn" class="btn btn-sm btn-ghost">
+                    <img class="btn-icon" src="/imgs/svg/common/clear.svg" alt="" />
+                    清空
                   </button>
                   <button id="export-scenes-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/export.svg" alt="" />
@@ -86,23 +92,6 @@
                 </div>
               </div>
               <div id="scenes-list"></div>
-            </div>
-            
-            <div class="config-section">
-              <h2 class="section-title">
-                <img class="section-icon" src="/imgs/svg/common/setting.svg" alt="" />
-                配置工具
-              </h2>
-              <div class="config-actions">
-                <button id="edit-hosts-btn" class="btn btn-ghost btn-block">
-                  <img class="btn-icon" src="/imgs/svg/status/hosts.svg" alt="" />
-                  编辑 Hosts
-                </button>
-                <button id="edit-proxy-btn" class="btn btn-ghost btn-block">
-                  <img class="btn-icon" src="/imgs/svg/status/proxy.svg" alt="" />
-                  编辑代理
-                </button>
-              </div>
             </div>
           </div>
         </div>

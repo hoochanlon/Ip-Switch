@@ -16,7 +16,88 @@ use tauri::{Manager, menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEve
 use std::fs;
 use std::path::PathBuf;
 
+#[cfg(target_os = "windows")]
+use winapi::um::securitybaseapi::GetTokenInformation;
+#[cfg(target_os = "windows")]
+use winapi::um::winnt::{TokenElevation, TOKEN_ELEVATION};
+#[cfg(target_os = "windows")]
+use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
+#[cfg(target_os = "windows")]
+use winapi::um::winnt::{TOKEN_QUERY, HANDLE};
+#[cfg(target_os = "windows")]
+use winapi::um::winuser::{MessageBoxW, MB_OK, MB_ICONWARNING};
+#[cfg(target_os = "windows")]
+use std::ptr;
+#[cfg(target_os = "windows")]
+use std::ffi::OsStr;
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
+
+#[cfg(target_os = "windows")]
+fn is_elevated() -> bool {
+    unsafe {
+        let mut token: HANDLE = ptr::null_mut();
+        let process = GetCurrentProcess();
+        
+        if OpenProcessToken(process, TOKEN_QUERY, &mut token) == 0 {
+            return false;
+        }
+        
+        if token.is_null() {
+            return false;
+        }
+        
+        let mut elevation: TOKEN_ELEVATION = std::mem::zeroed();
+        let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+        
+        let result = GetTokenInformation(
+            token,
+            TokenElevation,
+            &mut elevation as *mut _ as *mut _,
+            size,
+            &mut size,
+        );
+        
+        result != 0 && elevation.TokenIsElevated != 0
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_elevated() -> bool {
+    true // 非 Windows 系统总是返回 true
+}
+
+#[cfg(target_os = "windows")]
+fn show_admin_warning() {
+    unsafe {
+        let message: Vec<u16> = OsStr::new("此应用需要管理员权限才能修改网络配置和 Hosts 文件。\n\n请右键点击应用，选择\"以管理员身份运行\"。")
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let title: Vec<u16> = OsStr::new("需要管理员权限")
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        
+        MessageBoxW(
+            ptr::null_mut(),
+            message.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONWARNING as u32,
+        );
+    }
+}
+
 fn main() {
+    // 在 Windows 上检查管理员权限
+    #[cfg(target_os = "windows")]
+    {
+        if !is_elevated() {
+            show_admin_warning();
+            // 继续运行，但某些功能可能会失败
+        }
+    }
+    
     tauri::Builder::default()
         .setup(|app| {
             // 创建系统托盘菜单

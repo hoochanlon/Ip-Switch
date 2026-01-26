@@ -56,6 +56,13 @@ pub async fn get_scenes() -> Result<Vec<Scene>, String> {
         let entry = entry.map_err(|e| format!("读取场景文件失败: {}", e))?;
         let path = entry.path();
         
+        // 跳过备份文件，不显示在场景列表中
+        if let Some(file_name) = path.file_stem().and_then(|s| s.to_str()) {
+            if file_name.starts_with("_backup_") {
+                continue;
+            }
+        }
+        
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
             if let Ok(content) = fs::read_to_string(&path) {
                 if let Ok(scene) = serde_json::from_str::<Scene>(&content) {
@@ -117,12 +124,12 @@ pub async fn save_scene(scene_name: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 保存当前配置为备份（在应用场景前调用）
+/// 保存当前网络配置为备份（在应用场景前调用，只备份网卡IP配置）
 #[tauri::command]
 pub async fn save_backup() -> Result<(), String> {
     let scenes_dir = ensure_scenes_dir()?;
     
-    // 获取当前网络配置
+    // 只获取当前网络配置（不涉及Hosts和代理）
     use crate::network::get_network_info;
     let adapters = get_network_info().await?;
     
@@ -137,23 +144,12 @@ pub async fn save_backup() -> Result<(), String> {
         });
     }
     
-    // 获取当前Hosts内容
-    use crate::hosts::get_hosts;
-    let hosts_content = get_hosts().await.ok();
-    
-    // 获取当前代理配置
-    use crate::proxy::get_proxy;
-    let proxy_config = get_proxy().await.ok().map(|p| ProxyConfig {
-        enabled: p.enabled,
-        server: p.server,
-        bypass: p.bypass,
-    });
-    
+    // 只备份网络配置，不备份Hosts和代理
     let backup = Scene {
         name: "_backup_before_scene".to_string(),
         network_configs,
-        hosts_content,
-        proxy_config,
+        hosts_content: None,  // 不备份Hosts
+        proxy_config: None,  // 不备份代理
         tray_color: None,
     };
     
@@ -167,7 +163,7 @@ pub async fn save_backup() -> Result<(), String> {
     Ok(())
 }
 
-/// 恢复备份配置（解除场景）
+/// 恢复备份配置（解除场景，只恢复网卡IP配置）
 #[tauri::command]
 pub async fn restore_backup() -> Result<(), String> {
     let scenes_dir = ensure_scenes_dir()?;
@@ -183,7 +179,7 @@ pub async fn restore_backup() -> Result<(), String> {
     let backup: Scene = serde_json::from_str(&content)
         .map_err(|e| format!("解析备份文件失败: {}", e))?;
     
-    // 恢复网络配置
+    // 只恢复网络配置（不恢复Hosts和代理）
     use crate::network::{set_static_ip, set_dhcp};
     for (adapter_name, config) in backup.network_configs {
         if config.is_dhcp {
@@ -199,21 +195,7 @@ pub async fn restore_backup() -> Result<(), String> {
         }
     }
     
-    // 恢复Hosts配置
-    if let Some(hosts_content) = backup.hosts_content {
-        use crate::hosts::set_hosts;
-        set_hosts(hosts_content).await?;
-    }
-    
-    // 恢复代理配置
-    if let Some(proxy_config) = backup.proxy_config {
-        use crate::proxy::set_proxy;
-        set_proxy(
-            proxy_config.enabled,
-            proxy_config.server,
-            proxy_config.bypass,
-        ).await?;
-    }
+    // 不恢复Hosts和代理配置，场景只管理网卡IP
     
     Ok(())
 }
@@ -240,7 +222,7 @@ pub async fn apply_scene(scene_name: String) -> Result<(), String> {
     let scene: Scene = serde_json::from_str(&content)
         .map_err(|e| format!("解析场景文件失败: {}", e))?;
     
-    // 应用网络配置
+    // 只应用网络配置（场景只管理网卡IP配置，不涉及Hosts和代理）
     use crate::network::{set_static_ip, set_dhcp};
     for (adapter_name, config) in scene.network_configs {
         if config.is_dhcp {
@@ -256,21 +238,7 @@ pub async fn apply_scene(scene_name: String) -> Result<(), String> {
         }
     }
     
-    // 应用Hosts配置
-    if let Some(hosts_content) = scene.hosts_content {
-        use crate::hosts::set_hosts;
-        set_hosts(hosts_content).await?;
-    }
-    
-    // 应用代理配置
-    if let Some(proxy_config) = scene.proxy_config {
-        use crate::proxy::set_proxy;
-        set_proxy(
-            proxy_config.enabled,
-            proxy_config.server,
-            proxy_config.bypass,
-        ).await?;
-    }
+    // 不应用Hosts和代理配置，场景只管理网卡IP
     
     // 注意：托盘颜色更新需要在调用 apply_scene 时传入 AppHandle
     // 这里暂时不处理，由前端调用 update_tray_icon_color

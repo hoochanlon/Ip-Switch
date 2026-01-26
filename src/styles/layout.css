@@ -36,7 +36,7 @@
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 600px;
   gap: 16px;
 }
 
@@ -49,6 +49,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-width: 550px;
 }
 
 .sidebar {
@@ -57,7 +58,7 @@
   gap: 16px;
 }
 
-.scenes-section, .config-section {
+.scenes-section {
   background: #ffffff;
   border-radius: 14px;
   padding: 24px;
@@ -67,8 +68,7 @@
 }
 
 /* 侧边栏卡片内部：标题和内容拉开距离 */
-.scenes-section,
-.config-section {
+.scenes-section {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -92,8 +92,7 @@
 }
 
 /* 标题与内容的垂直间距（避免贴太紧） */
-.network-section > .section-title,
-.config-section > .section-title {
+.network-section > .section-title {
   margin-bottom: 2px;
 }
 

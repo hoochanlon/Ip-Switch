@@ -12,6 +12,7 @@ icon = ["icons/icon.ico"]
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
+winres = "0.1"
 
 [dependencies]
 tauri = { version = "2.0", features = ["tray-icon"] }
@@ -21,7 +22,7 @@ tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
 winreg = "0.50"
 ipconfig = "0.3"
-winapi = { version = "0.3", features = ["wininet"] }
+winapi = { version = "0.3", features = ["wininet", "winbase", "securitybaseapi", "winuser", "processthreadsapi"] }
 resvg = "0.42"
 tiny-skia = "0.11"
 ab_glyph = "0.2"
