@@ -10,10 +10,31 @@
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   padding: 0 12px;
+  padding-right: 0; /* 移除右侧padding，让背景延伸到边缘 */
   user-select: none;
   -webkit-app-region: drag;
   position: relative;
   z-index: 1000;
+  flex-shrink: 0;
+  /* 确保标题栏背景延伸到窗口边缘 */
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+  /* 使用伪元素覆盖滚动条区域 */
+  overflow: hidden;
+}
+
+/* 使用伪元素在右侧创建一个背景块来覆盖滚动条 */
+.window-titlebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px; /* 滚动条宽度 */
+  height: 100%;
+  background: var(--bg-secondary);
+  z-index: 999;
+  pointer-events: none;
 }
 
 .titlebar-left {
