@@ -16,11 +16,36 @@
         "height": 800,
         "resizable": true,
         "fullscreen": false,
-        "visible": true
+        "visible": true,
+        "decorations": false,
+        "transparent": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main window capabilities",
+          "windows": ["main"],
+          "permissions": [
+            "core:window:allow-minimize",
+            "core:window:allow-maximize",
+            "core:window:allow-unmaximize",
+            "core:window:allow-is-maximized",
+            "core:window:allow-hide",
+            "core:window:allow-show",
+            "core:window:allow-close",
+            "core:window:allow-start-dragging",
+            "core:window:allow-set-position",
+            "core:window:allow-inner-position",
+            "core:window:allow-inner-size",
+            "core:window:default",
+            "core:event:allow-listen",
+            "core:event:default"
+          ]
+        }
+      ]
     }
   }
 }

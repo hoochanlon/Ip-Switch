@@ -10,6 +10,7 @@ import { editProxy } from './proxy.js';
 import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAboutModal } from './ui.js';
 import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
 import { initHostsScheduledUpdate } from './hosts.js';
+import { initWindowControls, initWindowDrag } from './window-controls.js';
 
 // 初始化
 async function init() {
@@ -64,6 +65,10 @@ async function init() {
   
   // 初始化hosts定时更新功能
   initHostsScheduledUpdate();
+  
+  // 初始化窗口控制功能
+  await initWindowControls();
+  await initWindowDrag();
 }
 
 // 初始化网络状态检测

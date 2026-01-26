@@ -7,6 +7,31 @@
     <title>IP 配置管理器</title>
   </head>
   <body>
+    <!-- 自定义标题栏 -->
+    <div id="window-titlebar" class="window-titlebar">
+      <div class="titlebar-left">
+        <img class="app-logo-small" src="/imgs/ico/logo.png" alt="IP Switch" />
+        <span class="titlebar-title">IP 配置管理器</span>
+      </div>
+      <div class="titlebar-controls">
+        <button id="window-minimize" class="titlebar-button" aria-label="最小化" onclick="window.handleMinimize(event)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button id="window-maximize" class="titlebar-button" aria-label="最大化" onclick="window.handleMaximize(event)">
+          <svg id="window-maximize-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+        </button>
+        <button id="window-close" class="titlebar-button titlebar-button-close" aria-label="关闭" onclick="window.handleClose(event)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
     <div id="app">
       <div class="container">
         <div class="header">
