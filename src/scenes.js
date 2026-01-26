@@ -5,6 +5,7 @@ import * as state from './state.js';
 import { getNetworkTypeInfo } from './network.js';
 import { renderNetworkInfo, refreshNetworkInfo } from './network.js';
 import { updateStatusIndicator } from './ui.js';
+import { disableAutoSwitch } from './auto-switch.js';
 
 // 加载场景列表
 export async function loadScenes() {
@@ -396,6 +397,9 @@ window.saveSceneConfig = async function() {
 
 // 应用场景
 window.applyScene = async function(sceneName) {
+  // 应用场景时，禁用自动切换（二者只能选其一）
+  disableAutoSwitch();
+  
   // 立即更新UI状态，让用户看到即时反馈
   state.setCurrentScene(sceneName);
   renderScenes(); // 不等待，立即更新场景列表

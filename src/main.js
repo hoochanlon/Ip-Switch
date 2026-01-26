@@ -199,7 +199,6 @@ function setupEventListeners() {
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', editProxy);
-  document.getElementById('auto-switch-btn').addEventListener('click', showAutoSwitchConfig);
   
   // 主题切换按钮
   const themeToggleBtn = document.getElementById('theme-toggle-btn');

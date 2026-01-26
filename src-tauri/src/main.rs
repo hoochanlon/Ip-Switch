@@ -172,6 +172,7 @@ fn main() {
             set_dhcp,
             get_hosts,
             set_hosts,
+            fetch_remote_hosts,
             get_proxy,
             set_proxy,
             get_scenes,

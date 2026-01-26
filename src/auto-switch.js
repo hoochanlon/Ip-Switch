@@ -3,6 +3,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import * as state from './state.js';
 import { refreshNetworkInfo } from './network.js';
+import { renderScenes } from './scenes.js';
 
 // 自动切换配置
 let autoSwitchConfig = null;
@@ -26,6 +27,80 @@ export function initAutoSwitch() {
   
   // 监听网络信息更新事件，检测以太网插拔
   window.addEventListener('networkInfoUpdated', checkEthernetStatusChange);
+  
+  // 初始化复选框
+  initAutoSwitchCheckbox();
+}
+
+// 初始化自动切换复选框
+function initAutoSwitchCheckbox() {
+  const checkbox = document.getElementById('auto-switch-checkbox');
+  if (!checkbox) return;
+  
+  // 设置初始状态
+  if (autoSwitchConfig && autoSwitchConfig.enabled) {
+    checkbox.checked = true;
+  }
+  
+  // 监听复选框变化
+  checkbox.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    
+    if (enabled) {
+      // 如果启用自动切换，先检查是否有配置
+      if (!autoSwitchConfig || !autoSwitchConfig.adapterName) {
+        // 没有配置，先恢复复选框状态（因为还没有配置）
+        e.target.checked = false;
+        // 显示配置对话框（标记为从复选框打开，打开前状态为false）
+        showAutoSwitchConfig(true);
+        return;
+      }
+      
+      // 有配置，直接启用
+      // 清除当前场景（二者只能选其一）
+      if (state.currentScene) {
+        state.setCurrentScene(null);
+        await renderScenes();
+      }
+      
+      setAutoSwitchConfig({
+        ...autoSwitchConfig,
+        enabled: true
+      });
+    } else {
+      // 禁用自动切换
+      if (autoSwitchConfig) {
+        setAutoSwitchConfig({
+          ...autoSwitchConfig,
+          enabled: false
+        });
+      }
+    }
+  });
+  
+  // 双击复选框显示配置对话框（不改变复选框状态）
+  checkbox.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    showAutoSwitchConfig(false);
+  });
+}
+
+// 更新复选框状态
+export function updateAutoSwitchCheckbox() {
+  const checkbox = document.getElementById('auto-switch-checkbox');
+  if (checkbox) {
+    checkbox.checked = autoSwitchConfig && autoSwitchConfig.enabled || false;
+  }
+}
+
+// 禁用自动切换（当应用场景时调用）
+export function disableAutoSwitch() {
+  if (autoSwitchConfig && autoSwitchConfig.enabled) {
+    setAutoSwitchConfig({
+      ...autoSwitchConfig,
+      enabled: false
+    });
+  }
 }
 
 // 检查以太网状态变化
@@ -128,7 +203,15 @@ export function setAutoSwitchConfig(config) {
   autoSwitchConfig = config;
   localStorage.setItem('autoSwitchConfig', JSON.stringify(config));
   
+  // 更新复选框状态
+  updateAutoSwitchCheckbox();
+  
   if (config.enabled) {
+    // 启用自动切换时，清除当前场景（二者只能选其一）
+    if (state.currentScene) {
+      state.setCurrentScene(null);
+      renderScenes();
+    }
     startAutoSwitch();
   } else {
     stopAutoSwitch();
@@ -141,9 +224,13 @@ export function getAutoSwitchConfig() {
 }
 
 // 显示自动切换配置对话框
-export function showAutoSwitchConfig() {
+export function showAutoSwitchConfig(fromCheckbox = false) {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
+  
+  // 保存对话框打开前的复选框状态（如果是从复选框打开的）
+  const checkboxStateBeforeOpen = fromCheckbox ? 
+    (document.getElementById('auto-switch-checkbox')?.checked || false) : null;
   
   // 获取以太网适配器
   const ethernetAdapters = state.currentNetworkInfo?.filter(adapter => {
@@ -254,11 +341,37 @@ export function showAutoSwitchConfig() {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-secondary" onclick="window.cancelAutoSwitchConfig(${fromCheckbox ? 'true' : 'false'}, ${checkboxStateBeforeOpen === false ? 'false' : 'null'})">取消</button>
         <button class="btn btn-primary" onclick="window.saveAutoSwitchConfig()">保存</button>
       </div>
     </div>
   `;
+  
+  // 监听关闭按钮
+  modal.querySelector('.modal-close').addEventListener('click', () => {
+    if (fromCheckbox && checkboxStateBeforeOpen === false) {
+      // 如果是从未选中的复选框打开的，关闭时恢复为未选中
+      const checkbox = document.getElementById('auto-switch-checkbox');
+      if (checkbox) {
+        checkbox.checked = false;
+      }
+    }
+    modal.remove();
+  });
+  
+  // 监听遮罩层点击
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      if (fromCheckbox && checkboxStateBeforeOpen === false) {
+        // 如果是从未选中的复选框打开的，关闭时恢复为未选中
+        const checkbox = document.getElementById('auto-switch-checkbox');
+        if (checkbox) {
+          checkbox.checked = false;
+        }
+      }
+      modal.remove();
+    }
+  });
   
   document.body.appendChild(modal);
   
@@ -267,6 +380,21 @@ export function showAutoSwitchConfig() {
     document.getElementById('auto-switch-adapter').value = currentConfig.adapterName;
   }
 }
+
+// 取消自动切换配置
+window.cancelAutoSwitchConfig = function(fromCheckbox, checkboxStateBeforeOpen) {
+  const modal = document.querySelector('.modal-overlay');
+  if (modal) {
+    if (fromCheckbox && checkboxStateBeforeOpen === false) {
+      // 如果是从未选中的复选框打开的，关闭时恢复为未选中
+      const checkbox = document.getElementById('auto-switch-checkbox');
+      if (checkbox) {
+        checkbox.checked = false;
+      }
+    }
+    modal.remove();
+  }
+};
 
 // 保存自动切换配置
 window.saveAutoSwitchConfig = function() {
@@ -309,4 +437,9 @@ window.saveAutoSwitchConfig = function() {
   setAutoSwitchConfig(config);
   document.querySelector('.modal-overlay')?.remove();
   alert('自动切换配置已保存');
+  
+  // 如果启用了自动切换，更新复选框状态
+  if (config.enabled) {
+    updateAutoSwitchCheckbox();
+  }
 };

@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use reqwest;
 
 fn get_hosts_path() -> PathBuf {
     PathBuf::from("C:\\Windows\\System32\\drivers\\etc\\hosts")
@@ -29,4 +30,33 @@ pub async fn set_hosts(content: String) -> Result<(), String> {
         .map_err(|e| format!("写入Hosts文件失败: {}. 请确保以管理员权限运行", e))?;
     
     Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_remote_hosts(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("HTTP错误: {} {}", response.status().as_u16(), response.status().as_str()));
+    }
+    
+    let content = response
+        .text()
+        .await
+        .map_err(|e| format!("读取响应内容失败: {}", e))?;
+    
+    if content.trim().is_empty() {
+        return Err("远程内容为空".to_string());
+    }
+    
+    Ok(content)
 }
