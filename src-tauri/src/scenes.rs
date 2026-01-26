@@ -223,18 +223,24 @@ pub async fn apply_scene(scene_name: String) -> Result<(), String> {
         .map_err(|e| format!("解析场景文件失败: {}", e))?;
     
     // 只应用网络配置（场景只管理网卡IP配置，不涉及Hosts和代理）
+    // 串行执行所有网卡的配置，确保每个配置都成功应用
     use crate::network::{set_static_ip, set_dhcp};
+    
     for (adapter_name, config) in scene.network_configs {
+        let adapter_name_clone = adapter_name.clone();
         if config.is_dhcp {
-            set_dhcp(adapter_name).await?;
+            set_dhcp(adapter_name).await
+                .map_err(|e| format!("应用网卡 {} 的DHCP配置失败: {}", adapter_name_clone, e))?;
         } else if let (Some(ip), Some(subnet), Some(gateway)) = (config.ip, config.subnet, config.gateway) {
+            let dns = config.dns.unwrap_or_default();
             set_static_ip(
-                adapter_name,
+                adapter_name.clone(),
                 ip,
                 subnet,
                 gateway,
-                config.dns.unwrap_or_default(),
-            ).await?;
+                dns,
+            ).await
+                .map_err(|e| format!("应用网卡 {} 的静态IP配置失败: {}", adapter_name, e))?;
         }
     }
     

@@ -991,9 +991,23 @@ window.saveSceneConfig = async function() {
       trayColor: validTrayColor
     });
     
-    alert('场景已保存');
-    await loadScenes();
+    // 关闭编辑器
     document.querySelector('.modal-overlay')?.remove();
+    
+    // 重新加载场景列表
+    await loadScenes();
+    
+    // 如果这个场景是当前已应用的场景，自动应用新配置
+    const isCurrentScene = currentScene === sceneName;
+    
+    if (isCurrentScene) {
+      // 自动应用更新后的场景配置
+      try {
+        await window.applyScene(sceneName);
+      } catch (error) {
+        alert('场景已保存，但自动应用失败: ' + error);
+      }
+    }
   } catch (error) {
     alert('保存场景失败: ' + error);
   }
@@ -1001,33 +1015,53 @@ window.saveSceneConfig = async function() {
 
 // 应用场景
 window.applyScene = async function(sceneName) {
-  if (!confirm(`确定要应用场景 "${sceneName}" 吗？\n这将修改所选网卡的IP配置。`)) {
-    return;
-  }
+  // 立即更新UI状态，让用户看到即时反馈
+  currentScene = sceneName;
+  localStorage.setItem('currentScene', sceneName);
+  renderScenes(); // 不等待，立即更新场景列表
   
   try {
-    await invoke('apply_scene', { sceneName });
+    // 后台执行场景应用，不阻塞UI
+    const applyPromise = invoke('apply_scene', { sceneName });
     
     // 应用托盘颜色（如果场景中有设置）
     const scene = scenes.find(s => s.name === sceneName);
     if (scene && scene.tray_color) {
-      try {
-        await invoke('update_tray_icon_color', { hexColor: scene.tray_color });
-      } catch (error) {
+      // 托盘颜色更新也异步执行，不阻塞
+      invoke('update_tray_icon_color', { hexColor: scene.tray_color }).catch(error => {
         console.warn('更新托盘图标颜色失败:', error);
-        // 不阻止场景应用，只记录警告
-      }
+      });
     }
     
-    currentScene = sceneName;
-    // 持久化当前场景到本地存储
-    localStorage.setItem('currentScene', sceneName);
-    await renderScenes();
-    await updateStatusIndicator(); // 更新状态指示器
+    // 等待场景应用完成
+    await applyPromise;
+    
+    // 等待一下，让Windows系统有时间应用网络配置
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 等待UI刷新完成，确保显示最新的网络信息
+    await updateStatusIndicator();
     await refreshNetworkInfo();
-    alert('场景已应用');
   } catch (error) {
-    alert('应用场景失败: ' + error);
+    const errorMsg = String(error);
+    // 检查是否是权限错误
+    if (errorMsg.includes('权限不足') || errorMsg.includes('Access is denied') || errorMsg.includes('权限被拒绝')) {
+      const userChoice = confirm(
+        '应用场景失败: ' + errorMsg + '\n\n是否要以管理员权限重新启动程序？\n\n点击"确定"将以管理员权限重启，点击"取消"则取消操作。'
+      );
+      if (userChoice) {
+        try {
+          await invoke('request_admin_privileges');
+          // 如果成功，程序会重启，这里不会执行
+        } catch (restartError) {
+          alert('请求管理员权限失败: ' + restartError + '\n\n请手动右键点击应用程序，选择"以管理员身份运行"。');
+        }
+      }
+    } else {
+      alert('应用场景失败: ' + error);
+    }
+    // 如果失败，重新渲染以恢复状态
+    await renderScenes();
   }
 };
 
@@ -1153,12 +1187,28 @@ window.restoreScene = async function() {
   }
 };
 
+// 显示关于对话框
+window.showAboutModal = function() {
+  const modal = document.getElementById('about-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+};
+
+// 关闭关于对话框
+window.closeAboutModal = function() {
+  const modal = document.getElementById('about-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+};
+
 // 设置事件监听
 function setupEventListeners() {
   document.getElementById('refresh-btn').addEventListener('click', () => {
     refreshNetworkInfo(true); // 手动刷新时显示加载提示
   });
-  document.getElementById('about-btn').addEventListener('click', showAboutModal);
+  document.getElementById('about-btn').addEventListener('click', window.showAboutModal);
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', window.editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', window.editProxy);
@@ -1184,29 +1234,13 @@ function setupEventListeners() {
   }
 }
 
-// 显示关于对话框
-function showAboutModal() {
-  const modal = document.getElementById('about-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-  }
-}
-
-// 关闭关于对话框
-window.closeAboutModal = function() {
-  const modal = document.getElementById('about-modal');
-  if (modal) {
-    modal.style.display = 'none';
-  }
-};
-
 // 点击遮罩层关闭对话框
 document.addEventListener('DOMContentLoaded', () => {
   const aboutModal = document.getElementById('about-modal');
   if (aboutModal) {
     aboutModal.addEventListener('click', (e) => {
       if (e.target === aboutModal) {
-        closeAboutModal();
+        window.closeAboutModal();
       }
     });
   }

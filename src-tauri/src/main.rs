@@ -6,24 +6,18 @@ mod hosts;
 mod proxy;
 mod scenes;
 mod tray_icon;
+mod admin;
 
 use network::*;
 use hosts::*;
 use proxy::*;
 use scenes::*;
 use tray_icon::{TrayIconGenerator, update_tray_icon_color};
+use admin::{check_admin_privileges, request_admin_privileges, is_elevated_check, restart_as_admin_internal};
 use tauri::{Manager, menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}};
 use std::fs;
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use winapi::um::securitybaseapi::GetTokenInformation;
-#[cfg(target_os = "windows")]
-use winapi::um::winnt::{TokenElevation, TOKEN_ELEVATION};
-#[cfg(target_os = "windows")]
-use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
-#[cfg(target_os = "windows")]
-use winapi::um::winnt::{TOKEN_QUERY, HANDLE};
 #[cfg(target_os = "windows")]
 use winapi::um::winuser::{MessageBoxW, MB_OK, MB_ICONWARNING};
 #[cfg(target_os = "windows")]
@@ -32,40 +26,6 @@ use std::ptr;
 use std::ffi::OsStr;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
-
-#[cfg(target_os = "windows")]
-fn is_elevated() -> bool {
-    unsafe {
-        let mut token: HANDLE = ptr::null_mut();
-        let process = GetCurrentProcess();
-        
-        if OpenProcessToken(process, TOKEN_QUERY, &mut token) == 0 {
-            return false;
-        }
-        
-        if token.is_null() {
-            return false;
-        }
-        
-        let mut elevation: TOKEN_ELEVATION = std::mem::zeroed();
-        let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
-        
-        let result = GetTokenInformation(
-            token,
-            TokenElevation,
-            &mut elevation as *mut _ as *mut _,
-            size,
-            &mut size,
-        );
-        
-        result != 0 && elevation.TokenIsElevated != 0
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn is_elevated() -> bool {
-    true // 非 Windows 系统总是返回 true
-}
 
 #[cfg(target_os = "windows")]
 fn show_admin_warning() {
@@ -92,8 +52,22 @@ fn main() {
     // 在 Windows 上检查管理员权限
     #[cfg(target_os = "windows")]
     {
-        if !is_elevated() {
-            show_admin_warning();
+        if !is_elevated_check() {
+            // 开发模式下，尝试自动以管理员权限重启
+            #[cfg(debug_assertions)]
+            {
+                if let Err(e) = restart_as_admin_internal() {
+                    eprintln!("自动请求管理员权限失败: {}", e);
+                    show_admin_warning();
+                } else {
+                    // 成功启动管理员权限的程序，当前程序退出
+                    return;
+                }
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                show_admin_warning();
+            }
             // 继续运行，但某些功能可能会失败
         }
     }
@@ -212,6 +186,8 @@ fn main() {
             save_backup,
             restore_backup,
             has_backup,
+            check_admin_privileges,
+            request_admin_privileges,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

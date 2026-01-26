@@ -381,6 +381,58 @@ fn prefix_to_subnet(prefix: u8) -> Option<String> {
     Some(format!("{}.{}.{}.{}", mask[0], mask[1], mask[2], mask[3]))
 }
 
+// 检查 PowerShell 命令执行结果
+fn check_powershell_output(output: &std::process::Output, operation: &str) -> Result<(), String> {
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        
+        // 检查是否是权限错误
+        let error_text = if !stderr.trim().is_empty() {
+            stderr.trim()
+        } else if !stdout.trim().is_empty() {
+            stdout.trim()
+        } else {
+            ""
+        };
+        
+        // 检测权限错误的关键词
+        let is_permission_error = error_text.contains("Access is denied") 
+            || error_text.contains("权限被拒绝")
+            || error_text.contains("Windows System Error 5")
+            || error_text.contains("PermissionDenied")
+            || output.status.code() == Some(5);
+        
+        if is_permission_error {
+            return Err(format!(
+                "{}\n\n错误原因：权限不足\n\n解决方案：\n1. 请右键点击应用程序\n2. 选择\"以管理员身份运行\"\n3. 重新尝试应用场景\n\n详细错误信息：{}",
+                operation,
+                if error_text.is_empty() {
+                    format!("退出码: {}", output.status.code().unwrap_or(-1))
+                } else {
+                    error_text.to_string()
+                }
+            ));
+        }
+        
+        let error_msg = if !error_text.is_empty() {
+            format!("{}: {}", operation, error_text)
+        } else {
+            format!("{}失败: 退出码 {}", operation, output.status.code().unwrap_or(-1))
+        };
+        return Err(error_msg);
+    }
+    
+    // 检查 stderr 中是否有错误信息（即使退出码为0）
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.trim().is_empty() && !stderr.contains("Warning") {
+        // 忽略警告，但记录其他错误
+        eprintln!("PowerShell警告: {}", stderr.trim());
+    }
+    
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn set_static_ip(
     adapter_name: String,
@@ -389,61 +441,94 @@ pub async fn set_static_ip(
     gateway: String,
     dns: Vec<String>,
 ) -> Result<(), String> {
-    // 移除现有IP配置
-    Command::new("powershell")
+    // 第一步：移除现有的默认网关路由（如果存在）
+    let _remove_gateway = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue; if ($adapter) {{ $routes = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue; if ($routes) {{ $routes | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue }} }}",
                 adapter_name.replace("'", "''")
             )
         ])
-        .output()
-        .map_err(|e| format!("移除旧IP配置失败: {}", e))?;
-
-    // 设置静态IP
-    let prefix = subnet_to_prefix(&subnet)?;
+        .output();
     
-    Command::new("powershell")
+    // 第二步：移除现有IP配置（允许失败，因为可能没有现有IP）
+    let _remove_ip = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress {} -PrefixLength {} -DefaultGateway {}",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue",
+                adapter_name.replace("'", "''")
+            )
+        ])
+        .output();
+    
+    // 等待一下，确保旧配置已清除
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // 第三步：设置静态IP（不包含DefaultGateway参数，先设置IP）
+    let prefix = subnet_to_prefix(&subnet)?;
+    
+    let set_ip_output = Command::new("powershell")
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress {} -PrefixLength {} -ErrorAction Stop",
                 adapter_name.replace("'", "''"),
                 ip,
-                prefix,
+                prefix
+            )
+        ])
+        .output()
+        .map_err(|e| format!("执行设置静态IP命令失败: {}", e))?;
+    
+    check_powershell_output(&set_ip_output, &format!("为网卡 {} 设置静态IP", adapter_name))?;
+    
+    // 第四步：单独设置默认网关
+    let set_gateway_output = Command::new("powershell")
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; New-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -NextHop {} -ErrorAction Stop",
+                adapter_name.replace("'", "''"),
                 gateway
             )
         ])
         .output()
-        .map_err(|e| format!("设置静态IP失败: {}", e))?;
+        .map_err(|e| format!("执行设置网关命令失败: {}", e))?;
+    
+    check_powershell_output(&set_gateway_output, &format!("为网卡 {} 设置网关", adapter_name))?;
 
     // 禁用DHCP
-    Command::new("powershell")
+    let disable_dhcp_output = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; Set-NetIPInterface -InterfaceIndex $adapter.ifIndex -Dhcp Disabled",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-NetIPInterface -InterfaceIndex $adapter.ifIndex -Dhcp Disabled -ErrorAction Stop",
                 adapter_name.replace("'", "''")
             )
         ])
         .output()
-        .map_err(|e| format!("禁用DHCP失败: {}", e))?;
+        .map_err(|e| format!("执行禁用DHCP命令失败: {}", e))?;
+    
+    check_powershell_output(&disable_dhcp_output, &format!("为网卡 {} 禁用DHCP", adapter_name))?;
 
     // 设置DNS
     if !dns.is_empty() {
         let dns_str = dns.join(",");
-        Command::new("powershell")
+        let set_dns_output = Command::new("powershell")
             .args(&[
                 "-Command",
                 &format!(
-                    "$adapter = Get-NetAdapter -Name '{}'; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {}",
+                    "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {} -ErrorAction Stop",
                     adapter_name.replace("'", "''"),
                     dns_str
                 )
             ])
             .output()
-            .map_err(|e| format!("设置DNS失败: {}", e))?;
+            .map_err(|e| format!("执行设置DNS命令失败: {}", e))?;
+        
+        check_powershell_output(&set_dns_output, &format!("为网卡 {} 设置DNS", adapter_name))?;
     }
 
     Ok(())
@@ -451,41 +536,41 @@ pub async fn set_static_ip(
 
 #[tauri::command]
 pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
-    // 移除现有IP配置
-    Command::new("powershell")
+    // 移除现有IP配置（允许失败，因为可能没有现有IP）
+    let _ = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue; if ($adapter) {{ Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue }}",
                 adapter_name.replace("'", "''")
             )
         ])
-        .output()
-        .ok();
+        .output();
 
     // 启用DHCP
-    Command::new("powershell")
+    let enable_dhcp_output = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; Set-NetIPInterface -InterfaceIndex $adapter.ifIndex -Dhcp Enabled",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-NetIPInterface -InterfaceIndex $adapter.ifIndex -Dhcp Enabled -ErrorAction Stop",
                 adapter_name.replace("'", "''")
             )
         ])
         .output()
-        .map_err(|e| format!("启用DHCP失败: {}", e))?;
+        .map_err(|e| format!("执行启用DHCP命令失败: {}", e))?;
+    
+    check_powershell_output(&enable_dhcp_output, &format!("为网卡 {} 启用DHCP", adapter_name))?;
 
-    // 清除DNS设置（使用DHCP提供的DNS）
-    Command::new("powershell")
+    // 清除DNS设置（使用DHCP提供的DNS，允许失败）
+    let _ = Command::new("powershell")
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}'; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue; if ($adapter) {{ Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses -ErrorAction SilentlyContinue }}",
                 adapter_name.replace("'", "''")
             )
         ])
-        .output()
-        .ok();
+        .output();
 
     Ok(())
 }

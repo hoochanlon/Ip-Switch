@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev:admin": "powershell -Command \"Start-Process cmd -ArgumentList '/c cd /d %cd% && npm run tauri dev' -Verb RunAs\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0"
