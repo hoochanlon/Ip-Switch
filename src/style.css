@@ -1,4 +1,6 @@
 @import "./styles/base.css";
+@import "./styles/theme.css";
+@import "./styles/icons.css";
 @import "./styles/layout.css";
 @import "./styles/buttons.css";
 @import "./styles/scenes.css";

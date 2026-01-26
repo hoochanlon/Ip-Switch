@@ -5,10 +5,11 @@
 }
 
 .network-card {
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   padding: 15px;
   transition: all 0.3s;
+  background: var(--bg-secondary);
 }
 
 .network-card:hover {
@@ -25,7 +26,7 @@
 
 .network-header h3 {
   font-size: 16px;
-  color: #2d3748;
+  color: var(--text-primary);
 }
 
 .status-badge {
@@ -90,12 +91,12 @@
 
 .detail-row .label {
   font-weight: 500;
-  color: #718096;
+  color: var(--text-tertiary);
   min-width: 80px;
 }
 
 .detail-row .value {
-  color: #2d3748;
+  color: var(--text-secondary);
   word-break: break-all;
 }
 
@@ -105,7 +106,7 @@
   gap: 15px;
   align-items: center;
   padding: 8px 15px;
-  background: #f8f9fa;
+  background: var(--bg-tertiary);
   border-radius: 8px;
   margin-right: 10px;
 }
@@ -143,12 +144,7 @@
   margin-top: 4px;
 }
 
-.network-icon {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-}
-
+/* 图标样式已迁移到 icons.css */
 .network-type-badge.wifi {
   background: #ecfdf5;
   color: #065f46;

@@ -1,0 +1,149 @@
+/* ============================================
+   图标样式管理
+   统一管理项目中所有图标的样式定义
+   ============================================ */
+
+/* ============================================
+   应用 Logo
+   ============================================ */
+.app-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+/* ============================================
+   按钮图标
+   ============================================ */
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  opacity: 0.9;
+}
+
+/* 块级按钮中的图标（稍大一些） */
+.btn-block .btn-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+/* ============================================
+   章节图标
+   ============================================ */
+.section-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+/* ============================================
+   网络图标
+   ============================================ */
+.network-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+}
+
+/* 小尺寸网络图标（用于场景列表等） */
+.network-icon-small {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+
+/* ============================================
+   主题切换图标
+   ============================================ */
+.theme-toggle-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s;
+}
+
+.theme-toggle:hover .theme-toggle-icon {
+  transform: scale(1.1);
+}
+
+/* ============================================
+   通用图标样式
+   ============================================ */
+/* 图标基础样式 - 确保图标不会变形 */
+img[class*="icon"],
+img[class*="logo"] {
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* 图标悬停效果 */
+.btn:hover .btn-icon,
+.section-title:hover .section-icon {
+  opacity: 1;
+}
+
+/* 图标过渡动画 */
+.btn-icon,
+.section-icon,
+.network-icon,
+.network-icon-small,
+.theme-toggle-icon {
+  transition: opacity 0.2s ease, transform 0.2s ease, filter 0.3s ease;
+}
+
+/* ============================================
+   深色模式下的图标优化
+   ============================================ */
+/* 深色模式下将黑色图标转换为白色 */
+[data-theme="dark"] .btn-icon,
+[data-theme="dark"] .section-icon {
+  /* 使用 invert 滤镜将黑色图标反转成白色 */
+  filter: invert(1) brightness(1.1);
+  opacity: 0.95;
+}
+
+/* 深色模式下特别优化导入导出图标 */
+/* 导入导出图标有蓝色部分，反转后需要调整 */
+[data-theme="dark"] .btn-icon[src*="import.svg"],
+[data-theme="dark"] .btn-icon[src*="export.svg"] {
+  /* 反转颜色，使黑色部分变白，蓝色部分会变成橙色，然后调整色调 */
+  filter: invert(1) brightness(1.2) hue-rotate(180deg);
+  opacity: 1;
+}
+
+/* 深色模式下优化其他深色图标 */
+[data-theme="dark"] .btn-icon[src*="clear.svg"],
+[data-theme="dark"] .btn-icon[src*="refresh.svg"],
+[data-theme="dark"] .btn-icon[src*="new.svg"],
+[data-theme="dark"] .btn-icon[src*="view.svg"],
+[data-theme="dark"] .btn-icon[src*="setting.svg"],
+[data-theme="dark"] .btn-icon[src*="info.svg"],
+[data-theme="dark"] .section-icon {
+  /* 将黑色图标反转成白色 */
+  filter: invert(1) brightness(1.1);
+}
+
+/* 深色模式下图标悬停效果 */
+[data-theme="dark"] .btn:hover .btn-icon,
+[data-theme="dark"] .section-title:hover .section-icon {
+  filter: invert(1) brightness(1.3);
+  opacity: 1;
+}
+
+/* 深色模式下网络图标优化 */
+[data-theme="dark"] .network-icon,
+[data-theme="dark"] .network-icon-small {
+  /* 网络图标通常有颜色，根据实际情况调整 */
+  filter: invert(1) brightness(1.1);
+  opacity: 0.9;
+}
+
+/* 深色模式下状态图标优化（保持原有颜色，只调整亮度） */
+[data-theme="dark"] .btn-icon[src*="hosts.svg"],
+[data-theme="dark"] .btn-icon[src*="proxy.svg"],
+[data-theme="dark"] .btn-icon[src*="status.svg"] {
+  /* 状态图标如果有特定颜色，只调整亮度 */
+  filter: invert(1) brightness(1.1);
+}

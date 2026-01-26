@@ -5,8 +5,8 @@
   align-items: center;
   margin-bottom: 15px;
   padding: 10px 15px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   font-size: 13px;
   flex-wrap: wrap;
@@ -19,7 +19,7 @@
 }
 
 .status-label {
-  color: #718096;
+  color: var(--text-tertiary);
   font-weight: 500;
   font-size: 13px;
 }

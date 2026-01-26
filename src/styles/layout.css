@@ -1,10 +1,10 @@
 .header {
-  background: #ffffff;
+  background: var(--bg-secondary);
   border-radius: 14px;
   padding: 18px 18px 14px;
   margin-bottom: 16px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 25px rgba(17, 24, 39, 0.06);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px var(--shadow);
 }
 
 .app-title {
@@ -14,14 +14,9 @@
   margin-bottom: 12px;
 }
 
-.app-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-}
-
+/* 图标样式已迁移到 icons.css */
 .header h1 {
-  color: #111827;
+  color: var(--text-primary);
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -41,11 +36,11 @@
 }
 
 .network-section {
-  background: #ffffff;
+  background: var(--bg-secondary);
   border-radius: 14px;
   padding: 18px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 25px rgba(17, 24, 39, 0.06);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -59,11 +54,11 @@
 }
 
 .scenes-section {
-  background: #ffffff;
+  background: var(--bg-secondary);
   border-radius: 14px;
   padding: 24px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 10px 25px rgba(17, 24, 39, 0.06);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px var(--shadow);
   margin-bottom: 0;
 }
 
@@ -85,7 +80,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -96,12 +91,7 @@
   margin-bottom: 2px;
 }
 
-.section-icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.9;
-}
-
+/* 图标样式已迁移到 icons.css */
 .section-actions {
   display: flex;
   flex-wrap: wrap;

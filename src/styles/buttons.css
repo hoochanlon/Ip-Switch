@@ -12,40 +12,34 @@
 }
 
 .btn-primary {
-  background: #2563eb;
+  background: var(--btn-primary-bg);
   color: white;
 }
 
 .btn-primary:hover {
-  background: #1d4ed8;
+  background: var(--btn-primary-hover);
 }
 
 .btn-secondary {
-  background: #111827;
+  background: var(--btn-secondary-bg);
   color: #ffffff;
 }
 
 .btn-secondary:hover {
-  background: #0b1220;
+  background: var(--btn-secondary-hover);
 }
 
 .btn-ghost {
-  background: #f3f4f6;
-  color: #111827;
-  border: 1px solid #e5e7eb;
+  background: var(--btn-ghost-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-ghost:hover {
-  background: #eef2f7;
+  background: var(--btn-ghost-hover);
 }
 
-.btn-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  opacity: 0.9;
-}
-
+/* 图标样式已迁移到 icons.css */
 .btn-sm {
   padding: 8px 16px;
   font-size: 13px;
@@ -69,9 +63,5 @@
   border-radius: 12px;
 }
 
-.btn-block .btn-icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.9;
-}
+/* 图标样式已迁移到 icons.css */
 

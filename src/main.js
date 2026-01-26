@@ -1,6 +1,7 @@
 import './style.css';
 import { invoke } from '@tauri-apps/api/core';
 import NetworkStatus from './network-status.js';
+import { initTheme, toggleTheme } from './theme.js';
 
 // 应用状态
 let currentNetworkInfo = null;
@@ -11,6 +12,9 @@ let networkStatus = null;
 
 // 初始化
 async function init() {
+  // 初始化主题
+  initTheme();
+  
   // 从本地存储读取视图模式
   const savedMode = localStorage.getItem('viewMode');
   if (savedMode) {
@@ -161,7 +165,7 @@ async function renderScenes() {
       // 如果是当前应用场景且有备份，同时显示"应用"和"解除"按钮
       actionButtons = `
         <button class="btn btn-sm" onclick="applyScene('${scene.name}')">应用</button>
-        <button class="btn btn-sm btn-ghost" onclick="restoreScene()">解除</button>
+        <button class="btn btn-sm" onclick="restoreScene()">解除</button>
         <button class="btn btn-sm" onclick="editScene('${scene.name}')">编辑</button>
         <button class="btn btn-sm" onclick="deleteScene('${scene.name}')">删除</button>
       `;
@@ -1158,6 +1162,12 @@ function setupEventListeners() {
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', window.editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', window.editProxy);
+  
+  // 主题切换按钮
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', toggleTheme);
+  }
   
   const clearBtn = document.getElementById('clear-scenes-btn');
   if (clearBtn) {

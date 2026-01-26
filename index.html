@@ -49,9 +49,11 @@
               <img class="btn-icon" src="/imgs/svg/status/proxy.svg" alt="" />
               编辑代理
             </button>
-            <button id="about-btn" class="btn btn-ghost">
+            <button id="theme-toggle-btn" class="theme-toggle" title="切换主题">
+              <img class="theme-toggle-icon" id="theme-icon" src="/imgs/svg/common/sun.svg" alt="主题切换" />
+            </button>
+            <button id="about-btn" class="btn btn-ghost theme-toggle" title="关于">
               <img class="btn-icon" src="/imgs/svg/common/info.svg" alt="" />
-              关于
             </button>
           </div>
         </div>
@@ -102,7 +104,7 @@
     <div id="about-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-          <h2>关于 IP 配置管理器</h2>
+          <h2>关于</h2>
           <button class="modal-close" onclick="closeAboutModal()">&times;</button>
         </div>
         <div class="modal-body">

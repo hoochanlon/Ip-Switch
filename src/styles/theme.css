@@ -1,0 +1,79 @@
+/* 主题变量定义 */
+:root {
+  /* 浅色主题（默认） */
+  --bg-primary: #f6f7fb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #eef2f7;
+  
+  --text-primary: #111827;
+  --text-secondary: #4a5568;
+  --text-tertiary: #718096;
+  
+  --border-color: #e5e7eb;
+  --shadow: rgba(17, 24, 39, 0.06);
+  
+  --btn-primary-bg: #2563eb;
+  --btn-primary-hover: #1d4ed8;
+  --btn-secondary-bg: #111827;
+  --btn-secondary-hover: #0b1220;
+  --btn-ghost-bg: #f3f4f6;
+  --btn-ghost-hover: #eef2f7;
+  
+  --status-online: #10b981;
+  --status-offline: #ef4444;
+  --wifi-border: #10b981;
+}
+
+/* 夜间主题 */
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #475569;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  
+  --border-color: #334155;
+  --shadow: rgba(0, 0, 0, 0.3);
+  
+  --btn-primary-bg: #3b82f6;
+  --btn-primary-hover: #2563eb;
+  --btn-secondary-bg: #1e293b;
+  --btn-secondary-hover: #334155;
+  --btn-ghost-bg: #334155;
+  --btn-ghost-hover: #475569;
+  
+  --status-online: #10b981;
+  --status-offline: #ef4444;
+  --wifi-border: #10b981;
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+}
+
+/* 图标样式已迁移到 icons.css */
+
+/* 平滑过渡 */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

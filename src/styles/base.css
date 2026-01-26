@@ -14,10 +14,10 @@
 
 body {
   font-family: 'OPPOSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  background: #f6f7fb;
+  background: var(--bg-primary);
   min-height: 100vh;
   padding: 18px;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .container {
