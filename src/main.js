@@ -79,12 +79,31 @@ async function init() {
 
 // 初始化网络状态检测
 function initNetworkStatus() {
+  // 轻量节流：避免网络抖动/定时检测导致频繁拉取后端网卡信息
+  let lastBackendRefreshAt = 0;
+  let pendingBackendRefresh = null;
+
+  const maybeRefreshBackendNetworkInfo = async () => {
+    const now = Date.now();
+    if (pendingBackendRefresh) return pendingBackendRefresh;
+    if (now - lastBackendRefreshAt < 1000) return null;
+
+    lastBackendRefreshAt = now;
+    pendingBackendRefresh = refreshNetworkInfo(false).finally(() => {
+      pendingBackendRefresh = null;
+    });
+    return pendingBackendRefresh;
+  };
+
   state.setNetworkStatus(new NetworkStatus((status) => {
     console.log('网络状态:', status.isOnline ? '在线' : '离线');
     
     // 结合后端网络信息进行更准确的判断
-    checkNetworkStatusWithBackend();
-  }));
+    // 优先刷新一次网卡状态（节流），确保托盘颜色不会卡在旧状态
+    maybeRefreshBackendNetworkInfo().finally(() => {
+      checkNetworkStatusWithBackend();
+    });
+  }, { checkInterval: 1500, timeout: 1500 }));
 }
 
 // 结合后端网络信息检查网络状态

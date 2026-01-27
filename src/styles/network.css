@@ -2,6 +2,37 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+  min-height: 0; /* 允许在 flex 容器中正确滚动 */
+}
+
+/* 完全模式：网络列表区域单独滚动（右侧滚动条） */
+.network-section.full-mode {
+  /* 给列表区域留出空间滚动：让 section 在视口内自适应 */
+  flex: 1;
+  min-height: 0;
+}
+
+.network-section.full-mode #network-info {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.network-section.full-mode #network-info::-webkit-scrollbar {
+  width: 10px;
+}
+
+.network-section.full-mode #network-info::-webkit-scrollbar-thumb {
+  background: rgba(113, 128, 150, 0.35);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.network-section.full-mode #network-info::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 128, 150, 0.55);
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 .network-card {

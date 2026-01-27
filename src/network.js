@@ -28,6 +28,9 @@ export async function refreshNetworkInfo(showLoading = false) {
     
     // 直接渲染，不显示加载提示
     renderNetworkInfo();
+
+    // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
+    window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
   } catch (error) {
     console.error('获取网络信息失败:', error);
     // 只在显示加载提示或容器为空时才显示错误信息
@@ -46,6 +49,12 @@ export function renderNetworkInfo() {
 
   const container = document.getElementById('network-info');
   container.innerHTML = '';
+
+  // 完全模式下：让网络卡片列表区域单独可滚动（标题/筛选栏固定）
+  const networkSection = container.closest('.network-section');
+  if (networkSection) {
+    networkSection.classList.toggle('full-mode', state.viewMode === 'full');
+  }
 
   // 在完全模式下显示筛选控件
   const filterContainer = document.getElementById('network-filter-container');
