@@ -11,20 +11,20 @@
       <div id="window-titlebar" class="window-titlebar">
       <div class="titlebar-left">
         <img class="app-logo-small" src="/imgs/ico/logo.svg" alt="IP Switch" />
-        <span class="titlebar-title">IP Switch</span>
+        <span class="titlebar-title" data-i18n="appTitle">IP Switch</span>
       </div>
       <div class="titlebar-controls">
-        <button id="window-minimize" class="titlebar-button" aria-label="最小化" onclick="window.handleMinimize(event)">
+        <button id="window-minimize" class="titlebar-button" aria-label="Minimize" onclick="window.handleMinimize(event)">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </button>
-        <button id="window-maximize" class="titlebar-button" aria-label="最大化" onclick="window.handleMaximize(event)">
+        <button id="window-maximize" class="titlebar-button" aria-label="Maximize" onclick="window.handleMaximize(event)">
           <svg id="window-maximize-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.5" fill="none"/>
           </svg>
         </button>
-        <button id="window-close" class="titlebar-button titlebar-button-close" aria-label="关闭" onclick="window.handleClose(event)">
+        <button id="window-close" class="titlebar-button titlebar-button-close" aria-label="Close" onclick="window.handleClose(event)">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -37,32 +37,35 @@
         <div class="header">
           <div class="app-title">
             <img class="app-logo" src="/imgs/ico/logo.svg" alt="IP Switch" />
-            <h1>IP Switch</h1>
+            <h1 data-i18n="appTitle">IP Switch</h1>
           </div>
           
           <!-- 状态指示器 -->
           <div id="status-indicator" class="status-indicator">
             <div class="status-item">
-              <span id="network-status-indicator" class="status-badge status-online">在线</span>
+              <span id="network-status-indicator" class="status-badge status-online" data-i18n="online">在线</span>
             </div>
             <div class="status-item">
-              <span class="status-label">场景模式:</span>
-              <span id="scene-status-indicator" class="status-badge">未应用</span>
+              <span class="status-label" data-i18n="sceneMode">场景模式:</span>
+              <span id="scene-status-indicator" class="status-badge" data-i18n="sceneNotApplied">未应用</span>
             </div>
           </div>
           
           <div class="header-actions">
             <button id="refresh-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
-              刷新
+              <span data-i18n="refresh">刷新</span>
             </button>
             <button id="edit-hosts-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/status/hosts.svg" alt="" />
-              编辑 Hosts
+              <span data-i18n="editHosts">编辑 Hosts</span>
             </button>
             <button id="edit-proxy-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/status/proxy.svg" alt="" />
-              编辑代理
+              <span data-i18n="editProxy">编辑代理</span>
+            </button>
+            <button id="lang-toggle-btn" class="theme-toggle" title="Language">
+              <img class="theme-toggle-icon" src="/imgs/svg/common/translation.svg" alt="Language" />
             </button>
             <button id="theme-toggle-btn" class="theme-toggle">
               <img class="theme-toggle-icon" id="theme-icon" src="/imgs/svg/common/sun.svg" alt="主题切换" />
@@ -78,10 +81,10 @@
             <div class="network-section-header">
               <h2 class="section-title">
                 <img class="section-icon" src="/imgs/svg/status/status.svg" alt="" />
-                网络状态
+                <span data-i18n="networkStatus">网络状态</span>
               </h2>
               <div id="network-filter-container" class="network-filter-container" style="display: none;">
-                <input type="text" id="network-filter-input" class="network-filter-input" placeholder="搜索网卡名称..." />
+                <input type="text" id="network-filter-input" class="network-filter-input" placeholder="搜索网卡名称..." data-i18n="searchAdapters" data-i18n-attr="placeholder" />
                 <button id="network-filter-btn" class="btn btn-sm btn-ghost network-filter-toggle">
                   <img class="btn-icon" src="/imgs/svg/common/filter.svg" alt="筛选" />
                 </button>
@@ -95,31 +98,31 @@
               <div class="section-header">
                 <h2 class="section-title">
                   <img class="section-icon" src="/imgs/svg/common/office.svg" alt="" />
-                  网卡场景管理
+                  <span data-i18n="sceneManager">网卡场景管理</span>
                 </h2>
                 <div class="section-actions">
                   <button id="create-scene-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/new.svg" alt="" />
-                    新建
+                    <span data-i18n="create">新建</span>
                   </button>
                   <button id="clear-scenes-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/clear.svg" alt="" />
-                    清空
+                    <span data-i18n="clear">清空</span>
                   </button>
                   <button id="export-scenes-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/export.svg" alt="" />
-                    导出
+                    <span data-i18n="export">导出</span>
                   </button>
                   <button id="import-scenes-btn" class="btn btn-sm btn-ghost">
                     <img class="btn-icon" src="/imgs/svg/common/import.svg" alt="" />
-                    导入
+                    <span data-i18n="import">导入</span>
                   </button>
                 </div>
               </div>
               <div class="auto-switch-control">
-                <span style="margin-right: 8px;">自动双向切换</span>
+                <span style="margin-right: 8px;" data-i18n="autoSwitch">自动双向切换</span>
                 <button id="auto-switch-config-btn" class="btn btn-sm" type="button">
-                  配置
+                  <span data-i18n="config">配置</span>
                 </button>
               </div>
               <div id="scenes-list"></div>
@@ -133,18 +136,18 @@
     <div id="about-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
-          <h2>关于</h2>
+          <h2 data-i18n="about">关于</h2>
           <button class="modal-close" onclick="closeAboutModal()">&times;</button>
         </div>
         <div class="modal-body">
           <div style="text-align: center; margin-bottom: 20px;">
             <h3 style="color: #667eea; margin-bottom: 10px;">IP Switch</h3>
-            <p style="color: #718096; margin-bottom: 5px;">版本: 1.0.0</p>
-            <p style="color: #718096; font-size: 14px;">一个便捷的 IP、Hosts、代理配置管理工具</p>
+            <p style="color: #718096; margin-bottom: 5px;" data-i18n="aboutVersion">版本: 1.0.0</p>
+            <p style="color: #718096; font-size: 14px;" data-i18n="aboutTagline">一个便捷的 IP、Hosts、代理配置管理工具</p>
           </div>
           <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
             <p style="margin-bottom: 15px; color: #4a5568;">
-              <strong>项目地址：</strong>
+              <strong data-i18n="aboutProjectUrlLabel">项目地址：</strong>
             </p>
             <a href="https://github.com/hoochanlon/IP-Switch" 
                target="_blank" 
@@ -152,12 +155,12 @@
               https://github.com/hoochanlon/IP-Switch
             </a>
             <p style="color: #718096; font-size: 13px; line-height: 1.6;">
-              本项目基于 Tauri 2.0 构建，提供了便捷的网络配置管理功能，包括静态 IP 配置、DHCP 设置、Hosts 文件编辑和代理配置等。
+              <span data-i18n="aboutDescription">本项目基于 Tauri 2.0 构建，提供了便捷的网络配置管理功能，包括静态 IP 配置、DHCP 设置、Hosts 文件编辑和代理配置等。</span>
             </p>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-primary" onclick="closeAboutModal()">确定</button>
+          <button class="btn btn-primary" onclick="closeAboutModal()" data-i18n="ok">确定</button>
         </div>
       </div>
     </div>

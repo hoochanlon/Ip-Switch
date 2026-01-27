@@ -1,6 +1,7 @@
 // 代理编辑相关功能
 
 import { invoke } from '@tauri-apps/api/core';
+import { t } from './i18n.js';
 
 // 编辑代理 - 使用表单界面
 export async function editProxy() {
@@ -8,7 +9,7 @@ export async function editProxy() {
     const proxy = await invoke('get_proxy');
     showProxyEditor(proxy);
   } catch (error) {
-    alert('加载代理配置失败: ' + error);
+    alert(t('loadProxyFailed', { error }));
   }
 }
 
@@ -19,33 +20,33 @@ function showProxyEditor(proxy) {
   modal.innerHTML = `
     <div class="modal-content proxy-modal">
       <div class="modal-header">
-        <h2>编辑代理配置</h2>
+        <h2>${t('proxyEditorTitle')}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="proxy-enabled" ${proxy.enabled ? 'checked' : ''}>
-            <span>启用代理</span>
+            <span>${t('proxyEnabled')}</span>
           </label>
         </div>
         <div class="form-group">
-          <label for="proxy-server">代理服务器:</label>
+          <label for="proxy-server">${t('proxyServer')}</label>
           <input type="text" id="proxy-server" class="form-input" 
                  placeholder="127.0.0.1:8080" 
                  value="${proxy.server || ''}">
-          <small class="form-hint">格式: IP:端口 或 域名:端口</small>
+          <small class="form-hint">${t('proxyServerHint')}</small>
         </div>
         <div class="form-group">
-          <label for="proxy-bypass">绕过列表:</label>
+          <label for="proxy-bypass">${t('proxyBypass')}</label>
           <textarea id="proxy-bypass" class="form-textarea" 
                     placeholder="localhost;127.0.0.1;*.local">${proxy.bypass?.join(';') || ''}</textarea>
-          <small class="form-hint">多个地址用分号(;)分隔，例如: localhost;127.0.0.1;*.local</small>
+          <small class="form-hint">${t('proxyBypassHint')}</small>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-        <button class="btn btn-primary" onclick="window.saveProxy()">保存</button>
+        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="window.saveProxy()">${t('save')}</button>
       </div>
     </div>
   `;
@@ -59,7 +60,7 @@ window.saveProxy = async function() {
   const bypassText = document.getElementById('proxy-bypass').value.trim();
   
   if (enabled && !server) {
-    alert('启用代理时必须填写代理服务器地址');
+    alert(t('proxyServerRequired'));
     return;
   }
   
@@ -71,9 +72,9 @@ window.saveProxy = async function() {
       server: enabled ? server : '',
       bypass
     });
-    alert('代理配置已更新');
+    alert(t('proxyUpdated'));
     document.querySelector('.modal-overlay')?.remove();
   } catch (error) {
-    alert('更新代理失败: ' + error);
+    alert(t('updateProxyFailed', { error }));
   }
 };

@@ -8,7 +8,6 @@ mod scenes;
 mod tray_icon;
 mod admin;
 
-use network::*;
 use hosts::*;
 use proxy::*;
 use scenes::*;
@@ -117,12 +116,12 @@ fn main() {
                         ..
                     } => {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
+                            // 单击/双击托盘图标时，始终“显示并聚焦”窗口，
+                            // 避免双击时由于多次切换导致“闪一下又隐藏”的问题。
+                            if !window.is_visible().unwrap_or(false) {
                                 let _ = window.show();
-                                let _ = window.set_focus();
                             }
+                            let _ = window.set_focus();
                         }
                     }
                     _ => {}
@@ -167,9 +166,10 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_network_info,
-            set_static_ip,
-            set_dhcp,
+            network::get_network_info,
+            network::set_static_ip,
+            network::set_dhcp,
+            set_dns_servers,
             get_hosts,
             set_hosts,
             fetch_remote_hosts,
@@ -195,6 +195,16 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 单独设置 DNS 服务器（不改变 IP 获取方式，可用于 DHCP + 自定义 DNS）
+///
+/// NOTE:
+/// 这里做一层转发，避免某些环境下 `network::set_dns_servers` 未能生成 tauri command wrapper
+/// 而导致 `__cmd__set_dns_servers` 找不到的编译错误。
+#[tauri::command]
+async fn set_dns_servers(adapter_name: String, dns: Vec<String>) -> Result<(), String> {
+    network::set_dns_servers_internal(adapter_name, dns).await
 }
 
 // 加载托盘图标（优先使用 SVG，失败则使用默认图标）

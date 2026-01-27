@@ -3,6 +3,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import * as state from './state.js';
 import { escapeHtml } from './utils.js';
+import { t } from './i18n.js';
 
 // 刷新网络信息
 // showLoading: 是否显示加载提示（默认 false，静默刷新）
@@ -11,7 +12,7 @@ export async function refreshNetworkInfo(showLoading = false) {
   
   // 只在需要显示加载提示时才清空内容
   if (showLoading) {
-    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">正在加载网络信息...</div>';
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
   }
   
   try {
@@ -21,7 +22,7 @@ export async function refreshNetworkInfo(showLoading = false) {
     if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
       // 只在显示加载提示或容器为空时才显示错误信息
       if (showLoading || container.innerHTML.trim() === '') {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #e53e3e;">未检测到网络适配器，请确保以管理员权限运行</div>';
+        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('noAdaptersFound')}</div>`;
       }
       return;
     }
@@ -64,7 +65,7 @@ export async function refreshNetworkInfo(showLoading = false) {
     console.error('获取网络信息失败:', error);
     // 只在显示加载提示或容器为空时才显示错误信息
     if (showLoading || container.innerHTML.trim() === '') {
-      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">获取网络信息失败: ${error}<br><small>请确保以管理员权限运行</small></div>`;
+      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('fetchNetworkInfoFailed', { error })}<br><small>${t('ensureAdmin')}</small></div>`;
     }
     
     // 即使获取失败，也检查网络状态（通过事件触发）
@@ -117,10 +118,10 @@ export function initNetworkFilter() {
     dropdown.style.display = 'none';
     dropdown.innerHTML = `
       <div class="network-filter-dropdown-header">
-        <div class="network-filter-dropdown-title">显示网卡</div>
+        <div class="network-filter-dropdown-title">${t('showAdapters')}</div>
         <div class="network-filter-dropdown-actions">
-          <button type="button" class="btn btn-sm btn-ghost" id="network-filter-select-all">全选</button>
-          <button type="button" class="btn btn-sm btn-ghost" id="network-filter-select-none">全不选</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="network-filter-select-all">${t('selectAll')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="network-filter-select-none">${t('selectNone')}</button>
         </div>
       </div>
       <div class="network-filter-dropdown-body">
@@ -264,10 +265,10 @@ export function initNetworkFilter() {
 export function getNetworkTypeInfo(networkType) {
   const types = {
     'wifi': { icon: 'imgs/svg/status/wifi.svg', label: 'WiFi', class: 'wifi' },
-    'ethernet': { icon: 'imgs/svg/status/ethernet.svg', label: '以太网', class: 'ethernet' },
-    'bluetooth': { icon: 'imgs/svg/status/bluetooth.svg', label: '蓝牙', class: 'bluetooth' },
+    'ethernet': { icon: 'imgs/svg/status/ethernet.svg', label: t('ethernet'), class: 'ethernet' },
+    'bluetooth': { icon: 'imgs/svg/status/bluetooth.svg', label: t('bluetooth'), class: 'bluetooth' },
     'vpn': { icon: 'imgs/svg/status/vpn.svg', label: 'VPN', class: 'vpn' },
-    'other': { icon: 'imgs/svg/status/connect.svg', label: '其他', class: 'other' }
+    'other': { icon: 'imgs/svg/status/connect.svg', label: t('other'), class: 'other' }
   };
   return types[networkType] || types['other'];
 }
@@ -304,7 +305,7 @@ function renderFullMode(container) {
   
   // 如果没有匹配的结果
   if (filteredAdapters.length === 0) {
-    container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">未找到匹配的网卡</div>`;
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('noMatchingAdapters')}</div>`;
     return;
   }
   
@@ -320,8 +321,8 @@ function renderFullMode(container) {
     const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
     card.className = `network-card ${typeInfo.class}-card`;
     
-    const ipType = adapter.is_dhcp ? 'DHCP' : '静态IP';
-    const status = adapter.is_enabled ? '已连接' : '未连接';
+    const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
+    const status = adapter.is_enabled ? t('connected') : t('disconnected');
     
     card.innerHTML = `
       <div class="network-header">
@@ -336,31 +337,31 @@ function renderFullMode(container) {
       </div>
       <div class="network-details">
         <div class="detail-row">
-          <span class="label">IP状态:</span>
+          <span class="label">${t('ipStatus')}:</span>
           <span class="value">${ipType}</span>
         </div>
         <div class="detail-row">
-          <span class="label">MAC地址:</span>
-          <span class="value">${adapter.mac_address || '未知'}</span>
+          <span class="label">${t('macAddress')}:</span>
+          <span class="value">${adapter.mac_address || t('unknown')}</span>
         </div>
         <div class="detail-row">
-          <span class="label">IP地址:</span>
-          <span class="value">${adapter.ip_address || '未配置'}</span>
+          <span class="label">${t('ipAddressLabel')}:</span>
+          <span class="value">${adapter.ip_address || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
-          <span class="label">子网掩码:</span>
-          <span class="value">${adapter.subnet_mask || '未配置'}</span>
+          <span class="label">${t('subnetMaskLabel')}:</span>
+          <span class="value">${adapter.subnet_mask || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
-          <span class="label">网关:</span>
-          <span class="value">${adapter.gateway || '未配置'}</span>
+          <span class="label">${t('gatewayLabel')}:</span>
+          <span class="value">${adapter.gateway || t('notConfigured')}</span>
         </div>
         <div class="detail-row dns-row">
           <span class="label">DNS:</span>
-          <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || '未配置'}</span>
+          <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">配置网络</button>
+      <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
     `;
     
     container.appendChild(card);
@@ -382,64 +383,64 @@ function showNetworkConfigEditor(adapter) {
   modal.innerHTML = `
     <div class="modal-content network-config-modal">
       <div class="modal-header">
-        <h2>配置网络: ${escapeHtml(adapter.name)}</h2>
+        <h2>${t('networkConfigTitle', { name: escapeHtml(adapter.name) })}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="radio-group-label">IP配置类型:</label>
+          <label class="radio-group-label">${t('ipConfigType')}</label>
           <div class="radio-group">
             <label class="radio-label">
               <input type="radio" name="ip-type" value="dhcp" id="ip-type-dhcp" ${adapter.is_dhcp ? 'checked' : ''} onchange="window.toggleStaticIPFields()">
-              <span>动态IP (DHCP)</span>
+              <span>${t('dhcp')}</span>
             </label>
             <label class="radio-label">
               <input type="radio" name="ip-type" value="static" id="ip-type-static" ${!adapter.is_dhcp ? 'checked' : ''} onchange="window.toggleStaticIPFields()">
-              <span>静态IP</span>
+              <span>${t('staticIp')}</span>
             </label>
           </div>
         </div>
         
         <div id="static-ip-fields" style="display: ${adapter.is_dhcp ? 'none' : 'block'};">
           <div class="form-group">
-            <label for="ip-address">IP地址:</label>
+            <label for="ip-address">${t('ipAddress')}</label>
             <input type="text" id="ip-address" class="form-input" 
                    placeholder="192.168.1.100" 
                    value="${adapter.ip_address || ''}"
                    pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">例如: 192.168.1.100</small>
+            <small class="form-hint">${t('ipExample')}</small>
           </div>
           
           <div class="form-group">
-            <label for="subnet-mask">子网掩码:</label>
+            <label for="subnet-mask">${t('subnetMask')}</label>
             <input type="text" id="subnet-mask" class="form-input" 
                    placeholder="255.255.255.0" 
                    value="${adapter.subnet_mask || ''}"
                    pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">例如: 255.255.255.0</small>
+            <small class="form-hint">${t('subnetExample')}</small>
           </div>
           
           <div class="form-group">
-            <label for="gateway">网关:</label>
+            <label for="gateway">${t('gateway')}</label>
             <input type="text" id="gateway" class="form-input" 
                    placeholder="192.168.1.1" 
                    value="${adapter.gateway || ''}"
                    pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">例如: 192.168.1.1</small>
+            <small class="form-hint">${t('gatewayExample')}</small>
           </div>
-          
-          <div class="form-group">
-            <label for="dns-servers">DNS服务器:</label>
-            <input type="text" id="dns-servers" class="form-input" 
-                   placeholder="8.8.8.8,8.8.4.4" 
-                   value="${adapter.dns_servers?.join(', ') || ''}">
-            <small class="form-hint">多个DNS服务器用逗号分隔，例如: 8.8.8.8,8.8.4.4</small>
-          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="dns-servers">${t('dnsServers')}</label>
+          <input type="text" id="dns-servers" class="form-input" 
+                 placeholder="8.8.8.8,8.8.4.4" 
+                 value="${adapter.dns_servers?.join(', ') || ''}">
+          <small class="form-hint">${t('dnsServersHint')}</small>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-        <button class="btn btn-primary" onclick="window.saveNetworkConfig('${adapter.name}')">保存</button>
+        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="window.saveNetworkConfig('${adapter.name}')">${t('save')}</button>
       </div>
     </div>
   `;
@@ -463,36 +464,42 @@ window.toggleStaticIPFields = function() {
 window.saveNetworkConfig = async function(adapterName) {
   const dhcpRadio = document.getElementById('ip-type-dhcp');
   const useDHCP = dhcpRadio.checked;
+  const dnsText = document.getElementById('dns-servers').value.trim();
+  const dns = dnsText ? dnsText.split(',').map(s => s.trim()).filter(s => s) : [];
   
   if (useDHCP) {
     try {
       await invoke('set_dhcp', { adapterName });
-      alert('已切换到动态IP (DHCP)');
+      
+      // 如果在 DHCP 模式下指定了 DNS，则单独设置 DNS（覆盖 DHCP 下发的 DNS）
+      if (dns.length > 0) {
+        await invoke('set_dns_servers', { adapterName, dns });
+      }
+      
+      const suffix = dns.length > 0 ? t('dhcpDnsSuffix') : '';
+      alert(t('switchToDhcpOk', { suffix }));
       await refreshNetworkInfo();
       document.querySelector('.modal-overlay')?.remove();
     } catch (error) {
-      alert('配置失败: ' + error);
+      alert(t('configFailed', { error }));
     }
   } else {
     // 验证静态IP配置
     const ip = document.getElementById('ip-address').value.trim();
     const subnet = document.getElementById('subnet-mask').value.trim();
     const gateway = document.getElementById('gateway').value.trim();
-    const dnsText = document.getElementById('dns-servers').value.trim();
     
     if (!ip || !subnet || !gateway) {
-      alert('请填写完整的IP配置信息（IP地址、子网掩码、网关）');
+      alert(t('staticConfigIncomplete'));
       return;
     }
     
     // 简单的IP格式验证
     const ipPattern = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
     if (!ipPattern.test(ip) || !ipPattern.test(subnet) || !ipPattern.test(gateway)) {
-      alert('IP地址格式不正确，请使用正确的IPv4格式');
+      alert(t('ipFormatInvalid'));
       return;
     }
-    
-    const dns = dnsText ? dnsText.split(',').map(s => s.trim()).filter(s => s) : [];
     
     try {
       await invoke('set_static_ip', {
@@ -502,11 +509,11 @@ window.saveNetworkConfig = async function(adapterName) {
         gateway,
         dns
       });
-      alert('静态IP配置成功');
+      alert(t('staticConfigOk'));
       await refreshNetworkInfo();
       document.querySelector('.modal-overlay')?.remove();
     } catch (error) {
-      alert('配置失败: ' + error);
+      alert(t('configFailed', { error }));
     }
   }
 };

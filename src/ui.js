@@ -1,6 +1,7 @@
 // UI 状态指示器和对话框相关功能
 
 import * as state from './state.js';
+import { t } from './i18n.js';
 
 // 更新状态指示器（网络状态和场景模式）
 export async function updateStatusIndicator() {
@@ -8,7 +9,7 @@ export async function updateStatusIndicator() {
   const networkIndicator = document.getElementById('network-status-indicator');
   if (networkIndicator) {
     const isOnline = state.networkStatus ? state.networkStatus.getStatus().isOnline : navigator.onLine;
-    networkIndicator.textContent = isOnline ? '在线' : '离线';
+    networkIndicator.textContent = isOnline ? t('online') : t('offline');
     networkIndicator.className = `status-badge ${isOnline ? 'status-online' : 'status-offline'}`;
   }
   
@@ -19,7 +20,7 @@ export async function updateStatusIndicator() {
       sceneIndicator.textContent = state.currentScene;
       sceneIndicator.className = 'status-badge status-scene-active';
     } else {
-      sceneIndicator.textContent = '未应用';
+      sceneIndicator.textContent = t('sceneNotApplied');
       sceneIndicator.className = 'status-badge status-scene-inactive';
     }
   }

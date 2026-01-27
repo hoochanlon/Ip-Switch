@@ -575,6 +575,29 @@ pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 单独设置 DNS 服务器（不改变 IP 获取方式，可用于 DHCP + 自定义 DNS）
+pub async fn set_dns_servers_internal(adapter_name: String, dns: Vec<String>) -> Result<(), String> {
+    if dns.is_empty() {
+        return Ok(());
+    }
+
+    let dns_str = dns.join(",");
+    let set_dns_output = Command::new("powershell")
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {} -ErrorAction Stop",
+                adapter_name.replace("'", "''"),
+                dns_str.replace("'", "''"),
+            ),
+        ])
+        .output()
+        .map_err(|e| format!("执行设置DNS命令失败: {}", e))?;
+
+    check_powershell_output(&set_dns_output, &format!("为网卡 {} 设置DNS", adapter_name))?;
+    Ok(())
+}
+
 /// Ping测试（Tauri command）
 #[tauri::command]
 pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {

@@ -6,6 +6,7 @@ import { getNetworkTypeInfo } from './network.js';
 import { renderNetworkInfo, refreshNetworkInfo } from './network.js';
 import { updateStatusIndicator } from './ui.js';
 import { disableAutoSwitch } from './auto-switch.js';
+import { t } from './i18n.js';
 
 // 加载场景列表
 export async function loadScenes() {
@@ -33,7 +34,7 @@ export async function renderScenes() {
   container.innerHTML = '';
   
   if (state.scenes.length === 0) {
-    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096; font-size: 12px;">暂无场景<br>点击"新建场景"创建</div>';
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096; font-size: 12px;">${t('noScenes')}<br>${t('clickNewToCreate')}</div>`;
     return;
   }
   
@@ -59,24 +60,24 @@ export async function renderScenes() {
     if (isCurrentScene && hasBackup) {
       // 如果是当前应用场景且有备份，同时显示"应用"和"解除"按钮
       actionButtons = `
-        <button class="btn btn-sm" onclick="window.applyScene('${scene.name}')">应用</button>
-        <button class="btn btn-sm" onclick="window.restoreScene()">解除</button>
-        <button class="btn btn-sm" onclick="window.editScene('${scene.name}')">编辑</button>
-        <button class="btn btn-sm" onclick="window.deleteScene('${scene.name}')">删除</button>
+        <button class="btn btn-sm" onclick="window.applyScene('${scene.name}')">${t('apply')}</button>
+        <button class="btn btn-sm" onclick="window.restoreScene()">${t('restore')}</button>
+        <button class="btn btn-sm" onclick="window.editScene('${scene.name}')">${t('edit')}</button>
+        <button class="btn btn-sm" onclick="window.deleteScene('${scene.name}')">${t('delete')}</button>
       `;
     } else {
       // 普通场景，显示"应用"按钮
       actionButtons = `
-        <button class="btn btn-sm" onclick="window.applyScene('${scene.name}')">应用</button>
-        <button class="btn btn-sm" onclick="window.editScene('${scene.name}')">编辑</button>
-        <button class="btn btn-sm" onclick="window.deleteScene('${scene.name}')">删除</button>
+        <button class="btn btn-sm" onclick="window.applyScene('${scene.name}')">${t('apply')}</button>
+        <button class="btn btn-sm" onclick="window.editScene('${scene.name}')">${t('edit')}</button>
+        <button class="btn btn-sm" onclick="window.deleteScene('${scene.name}')">${t('delete')}</button>
       `;
     }
     
     item.innerHTML = `
       <div class="scene-info">
         <span class="scene-name">${scene.name}</span>
-        <span class="scene-details">${networkCount} 个网卡</span>
+        <span class="scene-details">${t('adapterCount', { count: networkCount })}</span>
       </div>
       <div class="scene-actions">
         ${actionButtons}
@@ -89,7 +90,7 @@ export async function renderScenes() {
 // 新建场景
 window.createScene = async function() {
   if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
-    alert('没有可用的网络适配器');
+    alert(t('noAdaptersAvailable'));
     return;
   }
   
@@ -101,12 +102,12 @@ window.editScene = async function(sceneName) {
   try {
     const scene = state.scenes.find(s => s.name === sceneName);
     if (!scene) {
-      alert('场景不存在');
+      alert(t('sceneNotFound'));
       return;
     }
     showSceneEditor(scene);
   } catch (error) {
-    alert('加载场景失败: ' + error);
+    alert(t('loadSceneFailed', { error }));
   }
 };
 
@@ -176,33 +177,33 @@ function showSceneEditor(existingScene = null) {
             <input type="radio" name="ip-type-${adapter.name}" value="dhcp" 
                    ${config.is_dhcp ? 'checked' : ''} 
                    onchange="window.updateAdapterConfigType('${adapter.name}', true)">
-            <span>动态IP (DHCP)</span>
+            <span>${t('dhcp')}</span>
           </label>
           <label class="radio-label">
             <input type="radio" name="ip-type-${adapter.name}" value="static" 
                    ${!config.is_dhcp ? 'checked' : ''} 
                    onchange="window.updateAdapterConfigType('${adapter.name}', false)">
-            <span>静态IP</span>
+            <span>${t('staticIp')}</span>
           </label>
         </div>
         <div class="static-ip-config" style="display: ${config.is_dhcp ? 'none' : 'block'};">
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="IP地址" 
+            <input type="text" class="form-input" placeholder="${t('ipAddressLabel')}" 
                    value="${config.ip || ''}" 
                    onchange="window.updateAdapterConfig('${adapter.name}', 'ip', this.value)">
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="子网掩码" 
+            <input type="text" class="form-input" placeholder="${t('subnetMaskLabel')}" 
                    value="${config.subnet || ''}" 
                    onchange="window.updateAdapterConfig('${adapter.name}', 'subnet', this.value)">
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="网关" 
+            <input type="text" class="form-input" placeholder="${t('gatewayLabel')}" 
                    value="${config.gateway || ''}" 
                    onchange="window.updateAdapterConfig('${adapter.name}', 'gateway', this.value)">
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="DNS (逗号分隔)" 
+            <input type="text" class="form-input" placeholder="${t('dnsServersComma')}" 
                    value="${config.dns?.join(', ') || ''}" 
                    onchange="window.updateAdapterConfig('${adapter.name}', 'dns', this.value)">
           </div>
@@ -214,18 +215,18 @@ function showSceneEditor(existingScene = null) {
   modal.innerHTML = `
     <div class="modal-content scene-editor-modal">
       <div class="modal-header">
-        <h2>${existingScene ? '编辑场景' : '新建场景'}</h2>
+        <h2>${existingScene ? t('edit') : t('create')}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label for="scene-name">场景名称:</label>
+          <label for="scene-name">${t('sceneName')}:</label>
           <input type="text" id="scene-name" class="form-input" 
-                 placeholder="例如: 办公室网络" 
+                 placeholder="${t('sceneNamePlaceholder')}" 
                  value="${sceneName}">
         </div>
         <div class="form-group">
-          <label for="tray-color">托盘图标颜色:</label>
+          <label for="tray-color">${t('trayColor')}:</label>
           <div class="color-picker-container">
             <input type="color" id="tray-color-picker" 
                    value="${existingScene?.tray_color || '#3366FF'}">
@@ -235,18 +236,18 @@ function showSceneEditor(existingScene = null) {
                    pattern="^#[0-9A-Fa-f]{6}$"
                    onchange="window.updateTrayColorPreview()">
           </div>
-          <small class="form-hint">支持十六进制颜色格式，例如: #3366FF（蓝色）</small>
+          <small class="form-hint">${t('trayColorHint')}</small>
         </div>
         <div class="form-group">
-          <label>选择要配置的网卡:</label>
+          <label>${t('selectAdaptersToConfigure')}:</label>
           <div class="scene-adapters-list">
             ${adapterListHtml}
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-        <button class="btn btn-primary" onclick="window.saveSceneConfig()">保存场景</button>
+        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="window.saveSceneConfig()">${t('saveScene')}</button>
       </div>
     </div>
   `;
@@ -337,13 +338,13 @@ window.updateAdapterConfig = function(adapterName, field, value) {
 window.saveSceneConfig = async function() {
   const sceneName = document.getElementById('scene-name').value.trim();
   if (!sceneName) {
-    alert('请输入场景名称');
+    alert(t('sceneNameRequired'));
     return;
   }
   
   const selectedAdapters = Object.keys(window.sceneAdapterConfigs || {});
   if (selectedAdapters.length === 0) {
-    alert('请至少选择一个网卡并配置');
+    alert(t('sceneSelectAdapterRequired'));
     return;
   }
   
@@ -387,11 +388,11 @@ window.saveSceneConfig = async function() {
       try {
         await window.applyScene(sceneName);
       } catch (error) {
-        alert('场景已保存，但自动应用失败: ' + error);
+        alert(t('sceneAutoApplyFailed', { error }));
       }
     }
   } catch (error) {
-    alert('保存场景失败: ' + error);
+    alert(t('sceneSaveFailed', { error }));
   }
 };
 
@@ -449,11 +450,11 @@ window.applyScene = async function(sceneName) {
           await invoke('request_admin_privileges');
           // 如果成功，程序会重启，这里不会执行
         } catch (restartError) {
-          alert('请求管理员权限失败: ' + restartError + '\n\n请手动右键点击应用程序，选择"以管理员身份运行"。');
+          alert(t('requestAdminFailed', { error: restartError }));
         }
       }
     } else {
-      alert('应用场景失败: ' + error);
+      alert(t('applySceneFailed', { error }));
     }
     // 如果失败，重新渲染以恢复状态
     await renderScenes();
@@ -476,9 +477,9 @@ window.exportScenesConfig = async function() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    alert('场景配置已导出');
+    alert(t('exportScenesOk'));
   } catch (error) {
-    alert('导出场景配置失败: ' + error);
+    alert(t('exportScenesFailed', { error }));
   }
 };
 
@@ -499,9 +500,9 @@ window.importScenesConfig = async function() {
           const text = e.target.result;
           await invoke('import_scenes_json', { json: text });
           await loadScenes();
-          alert('场景配置已导入');
+          alert(t('importScenesOk'));
         } catch (error) {
-          alert('导入场景配置失败: ' + error);
+          alert(t('importScenesFailed', { error }));
         }
       };
       reader.readAsText(file, 'utf-8');
@@ -509,13 +510,13 @@ window.importScenesConfig = async function() {
 
     input.click();
   } catch (error) {
-    alert('导入场景配置失败: ' + error);
+    alert(t('importScenesFailed', { error }));
   }
 };
 
 // 删除场景
 window.deleteScene = async function(sceneName) {
-  if (!confirm(`确定要删除场景 "${sceneName}" 吗？`)) {
+  if (!confirm(t('confirmDeleteScene', { name: sceneName }))) {
     return;
   }
   
@@ -527,13 +528,13 @@ window.deleteScene = async function(sceneName) {
     await loadScenes();
     await updateStatusIndicator(); // 更新状态指示器
   } catch (error) {
-    alert('删除场景失败: ' + error);
+    alert(t('deleteSceneFailed', { error }));
   }
 };
 
 // 清空所有场景
 window.clearScenes = async function() {
-  if (!confirm('确定要清空所有场景吗？此操作不可恢复！')) {
+  if (!confirm(t('confirmClearScenes'))) {
     return;
   }
   
@@ -548,15 +549,15 @@ window.clearScenes = async function() {
     
     await loadScenes();
     await updateStatusIndicator();
-    alert('所有场景已清空');
+    alert(t('clearScenesOk'));
   } catch (error) {
-    alert('清空场景失败: ' + error);
+    alert(t('clearScenesFailed', { error }));
   }
 };
 
 // 解除场景（恢复备份）
 window.restoreScene = async function() {
-  if (!confirm('确定要解除当前场景并恢复到应用场景前的配置吗？')) {
+  if (!confirm(t('confirmRestoreScene'))) {
     return;
   }
   
@@ -578,8 +579,8 @@ window.restoreScene = async function() {
     await renderScenes();
     await updateStatusIndicator(); // 更新状态指示器
     await refreshNetworkInfo();
-    alert('场景已解除，配置已恢复');
+    alert(t('restoreSceneOk'));
   } catch (error) {
-    alert('解除场景失败: ' + error);
+    alert(t('restoreSceneFailed', { error }));
   }
 };

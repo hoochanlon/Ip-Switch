@@ -44,7 +44,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 650px; /* 限制网络状态框的最大宽度，让它不要那么长 */
 }
 
 .sidebar {

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import * as state from './state.js';
 import { refreshNetworkInfo, getNetworkTypeInfo } from './network.js';
 import { renderScenes } from './scenes.js';
+import { t } from './i18n.js';
 
 // 自动切换配置
 let autoSwitchConfig = null;
@@ -374,69 +375,69 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
   modal.innerHTML = `
     <div class="modal-content auto-switch-modal" style="max-width: 600px;">
       <div class="modal-header">
-        <h2>自动双向切换配置</h2>
+        <h2>${t('autoSwitchConfigTitle')}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="auto-switch-enabled" ${currentConfig.enabled ? 'checked' : ''}>
-            <span>启用自动切换</span>
+            <span>${t('autoSwitchEnabled')}</span>
           </label>
         </div>
         
         <div class="form-group">
-          <label for="auto-switch-adapter">网络适配器:</label>
+          <label for="auto-switch-adapter">${t('networkAdapter')}:</label>
           <select id="auto-switch-adapter" class="form-input">
             ${adapterOptions}
           </select>
         </div>
         
         <div class="form-group">
-          <label>网络1配置:</label>
+          <label>${t('network1Config')}:</label>
           <div class="form-group">
-            <label for="network1-mode">模式:</label>
+            <label for="network1-mode">${t('mode')}:</label>
             <select id="network1-mode" class="form-input">
               <option value="dhcp" ${currentConfig.network1?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
-              <option value="static" ${currentConfig.network1?.mode === 'static' ? 'selected' : ''}>静态IP</option>
+              <option value="static" ${currentConfig.network1?.mode === 'static' ? 'selected' : ''}>${t('staticIp')}</option>
             </select>
           </div>
           <div class="form-group" id="network1-dhcp-fields" style="display: ${currentConfig.network1?.mode === 'dhcp' ? 'block' : 'none'};">
-            <label for="network1-dhcp-dns">DNS服务器（逗号分隔）:</label>
+            <label for="network1-dhcp-dns">${t('dnsServersComma')}:</label>
             <input type="text" id="network1-dhcp-dns" class="form-input" 
                    value="${currentConfig.network1?.dhcp?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
           </div>
           <div class="form-group" id="network1-static-fields" style="display: ${currentConfig.network1?.mode === 'static' ? 'block' : 'none'};">
             <div class="form-group">
-              <label for="network1-static-ip">IP地址:</label>
+              <label for="network1-static-ip">${t('ipAddress')}</label>
               <input type="text" id="network1-static-ip" class="form-input" 
                      value="${currentConfig.network1?.staticConfig?.ip || ''}">
             </div>
             <div class="form-group">
-              <label for="network1-static-subnet">子网掩码:</label>
+              <label for="network1-static-subnet">${t('subnetMask')}</label>
               <input type="text" id="network1-static-subnet" class="form-input" 
                      value="${currentConfig.network1?.staticConfig?.subnet || ''}">
             </div>
             <div class="form-group">
-              <label for="network1-static-gateway">网关:</label>
+              <label for="network1-static-gateway">${t('gateway')}</label>
               <input type="text" id="network1-static-gateway" class="form-input" 
                      value="${currentConfig.network1?.staticConfig?.gateway || ''}">
             </div>
             <div class="form-group">
-              <label for="network1-static-dns">DNS服务器（逗号分隔）:</label>
+              <label for="network1-static-dns">${t('dnsServersComma')}:</label>
               <input type="text" id="network1-static-dns" class="form-input" 
                      value="${currentConfig.network1?.staticConfig?.dns?.join(', ') || ''}">
             </div>
           </div>
           <div class="form-group">
-            <label for="network1-ping">Ping测试目标:</label>
+            <label for="network1-ping">${t('pingTarget')}:</label>
             <input type="text" id="network1-ping" class="form-input" 
                    value="${currentConfig.network1?.pingTarget || 'baidu.com'}"
-                   placeholder="例如: baidu.com 或 1.1.1.1">
-            <small class="form-hint">无法ping通时将尝试切换到网络2</small>
+                   placeholder="${t('pingTargetPlaceholder1')}">
+            <small class="form-hint">${t('pingHintToNetwork2')}</small>
           </div>
           <div class="form-group">
-            <label for="network1-tray-color">托盘图标颜色（网络1）:</label>
+            <label for="network1-tray-color">${t('trayColorNetwork1')}:</label>
             <div class="color-picker-container">
               <input type="color" id="network1-tray-color-picker" 
                      value="${currentConfig.network1?.trayColor || '#00FF00'}">
@@ -450,50 +451,50 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
         </div>
 
         <div class="form-group">
-          <label>网络2配置:</label>
+          <label>${t('network2Config')}:</label>
           <div class="form-group">
-            <label for="network2-mode">模式:</label>
+            <label for="network2-mode">${t('mode')}:</label>
             <select id="network2-mode" class="form-input">
               <option value="dhcp" ${currentConfig.network2?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
-              <option value="static" ${currentConfig.network2?.mode === 'static' ? 'selected' : ''}>静态IP</option>
+              <option value="static" ${currentConfig.network2?.mode === 'static' ? 'selected' : ''}>${t('staticIp')}</option>
             </select>
           </div>
           <div class="form-group" id="network2-dhcp-fields" style="display: ${currentConfig.network2?.mode === 'dhcp' ? 'block' : 'none'};">
-            <label for="network2-dhcp-dns">DNS服务器（逗号分隔）:</label>
+            <label for="network2-dhcp-dns">${t('dnsServersComma')}:</label>
             <input type="text" id="network2-dhcp-dns" class="form-input" 
                    value="${currentConfig.network2?.dhcp?.dns?.join(', ') || ''}">
           </div>
           <div class="form-group" id="network2-static-fields" style="display: ${currentConfig.network2?.mode === 'static' ? 'block' : 'none'};">
             <div class="form-group">
-              <label for="network2-static-ip">IP地址:</label>
+              <label for="network2-static-ip">${t('ipAddress')}</label>
               <input type="text" id="network2-static-ip" class="form-input" 
                      value="${currentConfig.network2?.staticConfig?.ip || '172.16.1.55'}">
             </div>
             <div class="form-group">
-              <label for="network2-static-subnet">子网掩码:</label>
+              <label for="network2-static-subnet">${t('subnetMask')}</label>
               <input type="text" id="network2-static-subnet" class="form-input" 
                      value="${currentConfig.network2?.staticConfig?.subnet || '255.255.255.0'}">
             </div>
             <div class="form-group">
-              <label for="network2-static-gateway">网关:</label>
+              <label for="network2-static-gateway">${t('gateway')}</label>
               <input type="text" id="network2-static-gateway" class="form-input" 
                      value="${currentConfig.network2?.staticConfig?.gateway || '172.16.1.254'}">
             </div>
             <div class="form-group">
-              <label for="network2-static-dns">DNS服务器（逗号分隔）:</label>
+              <label for="network2-static-dns">${t('dnsServersComma')}:</label>
               <input type="text" id="network2-static-dns" class="form-input" 
                      value="${currentConfig.network2?.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
             </div>
           </div>
           <div class="form-group">
-            <label for="network2-ping">Ping测试目标:</label>
+            <label for="network2-ping">${t('pingTarget')}:</label>
             <input type="text" id="network2-ping" class="form-input" 
                    value="${currentConfig.network2?.pingTarget || '172.16.1.254'}"
-                   placeholder="例如: 172.16.1.254">
-            <small class="form-hint">无法ping通时将尝试切换到网络1</small>
+                   placeholder="${t('pingTargetPlaceholder2')}">
+            <small class="form-hint">${t('pingHintToNetwork1')}</small>
           </div>
           <div class="form-group">
-            <label for="network2-tray-color">托盘图标颜色（网络2）:</label>
+            <label for="network2-tray-color">${t('trayColorNetwork2')}:</label>
             <div class="color-picker-container">
               <input type="color" id="network2-tray-color-picker" 
                      value="${currentConfig.network2?.trayColor || '#FFA500'}">
@@ -507,8 +508,8 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="window.cancelAutoSwitchConfig(${fromCheckbox ? 'true' : 'false'}, ${checkboxStateBeforeOpen === false ? 'false' : 'null'})">取消</button>
-        <button class="btn btn-primary" onclick="window.saveAutoSwitchConfig()">保存</button>
+        <button class="btn btn-secondary" onclick="window.cancelAutoSwitchConfig(${fromCheckbox ? 'true' : 'false'}, ${checkboxStateBeforeOpen === false ? 'false' : 'null'})">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="window.saveAutoSwitchConfig()">${t('save')}</button>
       </div>
     </div>
   `;
@@ -606,24 +607,24 @@ window.saveAutoSwitchConfig = function() {
   const validNetwork2TrayColor = network2TrayColor && /^#[0-9A-Fa-f]{6}$/.test(network2TrayColor) ? network2TrayColor : '#FFA500';
   
   if (!adapterName) {
-    alert('请选择网络适配器');
+    alert(t('selectAdapter'));
     return;
   }
   
   if (!network1Ping || !network2Ping) {
-    alert('请填写两个网络的ping测试目标');
+    alert(t('pingTargetsRequired'));
     return;
   }
 
   if (network1Mode === 'static') {
     if (!network1StaticIp || !network1StaticSubnet || !network1StaticGateway) {
-      alert('网络1静态配置请填写IP/子网/网关');
+      alert(`${t('network1')}${t('staticConfigIncomplete')}`);
       return;
     }
   }
   if (network2Mode === 'static') {
     if (!network2StaticIp || !network2StaticSubnet || !network2StaticGateway) {
-      alert('网络2静态配置请填写IP/子网/网关');
+      alert(`${t('network2')}${t('staticConfigIncomplete')}`);
       return;
     }
   }

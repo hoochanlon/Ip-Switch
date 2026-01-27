@@ -2,6 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { escapeHtml } from './utils.js';
+import { t } from './i18n.js';
 
 // 默认远程hosts URL
 const DEFAULT_HOSTS_URL = 'https://gitlab.com/ineo6/hosts/-/raw/master/next-hosts';
@@ -17,7 +18,7 @@ export async function editHosts() {
     const content = await invoke('get_hosts');
     showHostsEditor(content);
   } catch (error) {
-    alert('加载Hosts文件失败: ' + error);
+    alert(t('loadHostsFailed', { error }));
   }
 }
 
@@ -35,34 +36,34 @@ function showHostsEditor(content) {
   modal.innerHTML = `
     <div class="modal-content hosts-modal">
       <div class="modal-header">
-        <h2>编辑 Hosts 文件</h2>
+        <h2>${t('hostsEditorTitle')}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
         <div class="hosts-toolbar">
           <div class="hosts-url-input-group">
-            <label for="hosts-url-input" style="font-size: 12px; color: var(--text-secondary); margin-right: 8px;">远程URL:</label>
+            <label for="hosts-url-input" style="font-size: 12px; color: var(--text-secondary); margin-right: 8px;">${t('remoteUrl')}</label>
             <input type="text" id="hosts-url-input" class="form-input" 
                    value="${escapeHtml(savedUrl)}" 
                    placeholder="${escapeHtml(DEFAULT_HOSTS_URL)}"
                    style="flex: 1; min-width: 300px;">
             <button id="hosts-update-btn" class="btn btn-sm btn-ghost" onclick="window.updateHostsFromRemote()">
               <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
-              更新
+              ${t('update')}
             </button>
           </div>
           <div class="hosts-scheduled-update-group" style="margin-top: 8px;">
             <label class="checkbox-label">
               <input type="checkbox" id="hosts-scheduled-update-checkbox" ${scheduledUpdateConfig.enabled ? 'checked' : ''}>
-              <span>定时更新（每天9:00、17:00）</span>
+              <span>${t('scheduledUpdate')}</span>
             </label>
           </div>
         </div>
         <textarea id="hosts-editor" class="hosts-editor" spellcheck="false">${escapeHtml(content)}</textarea>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-        <button class="btn btn-primary" onclick="window.saveHosts()">保存</button>
+        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('cancel')}</button>
+        <button class="btn btn-primary" onclick="window.saveHosts()">${t('save')}</button>
       </div>
     </div>
   `;
@@ -114,7 +115,7 @@ window.updateHostsFromRemote = async function() {
   
   const url = urlInput.value.trim();
   if (!url) {
-    alert('请输入远程URL');
+    alert(t('enterRemoteUrl'));
     return;
   }
   
@@ -122,7 +123,7 @@ window.updateHostsFromRemote = async function() {
   try {
     new URL(url);
   } catch (e) {
-    alert('URL格式不正确，请输入有效的URL');
+    alert(t('urlFormatInvalid'));
     return;
   }
   
@@ -135,14 +136,14 @@ window.updateHostsFromRemote = async function() {
   
   const originalText = updateBtn.innerHTML;
   updateBtn.disabled = true;
-  updateBtn.innerHTML = '<span>更新中...</span>';
+  updateBtn.innerHTML = `<span>${t('updating')}</span>`;
   
   try {
     // 从远程获取hosts内容（通过后端）
     const remoteContent = await invoke('fetch_remote_hosts', { url });
     
     if (!remoteContent || !remoteContent.trim()) {
-      alert('远程内容为空');
+      alert(t('remoteContentEmpty'));
       updateBtn.disabled = false;
       updateBtn.innerHTML = originalText;
       return;
@@ -175,11 +176,11 @@ window.updateHostsFromRemote = async function() {
     // 滚动到底部显示新添加的内容
     editor.scrollTop = editor.scrollHeight;
     
-    alert(`已从远程更新hosts内容\n\n新增 ${remoteLines.length} 条记录`);
+    alert(t('hostsUpdatedOk'));
   } catch (error) {
     console.error('从远程更新hosts失败:', error);
     const errorMsg = typeof error === 'string' ? error : error.message || String(error);
-    alert('从远程更新hosts失败: ' + errorMsg + '\n\n请检查：\n1. 网络连接是否正常\n2. URL是否正确\n3. 服务器是否可访问');
+    alert(t('remoteUpdateFailed', { error: errorMsg }));
   } finally {
     updateBtn.disabled = false;
     updateBtn.innerHTML = originalText;
@@ -193,10 +194,10 @@ window.saveHosts = async function() {
   
   try {
     await invoke('set_hosts', { content: editor.value });
-    alert('Hosts文件已更新');
+    alert(t('hostsUpdatedOk'));
     document.querySelector('.modal-overlay')?.remove();
   } catch (error) {
-    alert('更新Hosts失败: ' + error);
+    alert(t('hostsUpdateFailed', { error }));
   }
 };
 

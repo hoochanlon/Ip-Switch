@@ -11,9 +11,13 @@ import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAbou
 import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
 import { initHostsScheduledUpdate } from './hosts.js';
 import { initWindowControls, initWindowDrag } from './window-controls.js';
+import { initI18n, toggleLanguage } from './i18n.js';
 
 // 初始化
 async function init() {
+  // 初始化 i18n
+  initI18n();
+
   // 初始化主题
   initTheme();
 
@@ -219,6 +223,12 @@ function setupEventListeners() {
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', editProxy);
+
+  // 语言切换按钮
+  const langToggleBtn = document.getElementById('lang-toggle-btn');
+  if (langToggleBtn) {
+    langToggleBtn.addEventListener('click', toggleLanguage);
+  }
   
   // 主题切换按钮
   const themeToggleBtn = document.getElementById('theme-toggle-btn');

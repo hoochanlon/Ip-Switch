@@ -12,8 +12,10 @@
     "windows": [
       {
         "title": "IP 配置管理器",
-        "width": 1200,
-        "height": 800,
+        "width": 1199,
+        "height": 888,
+        "minWidth": 1199,
+        "minHeight": 888,
         "resizable": true,
         "fullscreen": false,
         "visible": true,
