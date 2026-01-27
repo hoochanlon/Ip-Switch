@@ -213,6 +213,13 @@ window.editProxy = editProxy;
 window.showAboutModal = showAboutModal;
 window.closeAboutModal = closeAboutModal;
 window.showAutoSwitchConfig = showAutoSwitchConfig;
+window.openDevtools = async () => {
+  try {
+    await invoke('open_devtools');
+  } catch (error) {
+    console.error('打开开发者工具失败:', error);
+  }
+};
 
 // 设置事件监听
 function setupEventListeners() {
@@ -223,6 +230,12 @@ function setupEventListeners() {
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', editProxy);
+  const devtoolsBtn = document.getElementById('open-devtools-btn');
+  if (devtoolsBtn) {
+    devtoolsBtn.addEventListener('click', () => {
+      window.openDevtools();
+    });
+  }
 
   // 语言切换按钮
   const langToggleBtn = document.getElementById('lang-toggle-btn');

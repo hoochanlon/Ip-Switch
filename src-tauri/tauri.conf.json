@@ -33,6 +33,7 @@
             "main"
           ],
           "permissions": [
+            "core:webview:allow-internal-toggle-devtools",
             "core:window:allow-minimize",
             "core:window:allow-maximize",
             "core:window:allow-unmaximize",

@@ -192,6 +192,7 @@ fn main() {
             request_admin_privileges,
             network::ping_test,
             network::auto_switch_network,
+            open_devtools,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -205,6 +206,15 @@ fn main() {
 #[tauri::command]
 async fn set_dns_servers(adapter_name: String, dns: Vec<String>) -> Result<(), String> {
     network::set_dns_servers_internal(adapter_name, dns).await
+}
+
+/// 打开当前窗口的开发者工具（仅在调试/开发模式下有效）
+#[tauri::command]
+async fn open_devtools(window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
+    {
+        window.open_devtools();
+    }
 }
 
 // 加载托盘图标（优先使用 SVG，失败则使用默认图标）
