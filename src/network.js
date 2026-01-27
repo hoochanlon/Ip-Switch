@@ -440,7 +440,7 @@ function showNetworkConfigEditor(adapter) {
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('cancel')}</button>
-        <button class="btn btn-primary" onclick="window.saveNetworkConfig('${adapter.name}')">${t('save')}</button>
+        <button class="btn btn-primary" onclick="window.saveNetworkConfig(this, '${adapter.name}')">${t('save')}</button>
       </div>
     </div>
   `;
@@ -461,36 +461,29 @@ window.toggleStaticIPFields = function() {
 };
 
 // 保存网络配置
-window.saveNetworkConfig = async function(adapterName) {
+// 优化：表单校验在前，通过后立刻关闭对应弹窗，再在后台异步执行配置，避免界面长时间卡住
+window.saveNetworkConfig = function(buttonEl, adapterName) {
   const dhcpRadio = document.getElementById('ip-type-dhcp');
+  if (!dhcpRadio) {
+    console.error('找不到 DHCP/静态IP 单选框');
+    return;
+  }
+
   const useDHCP = dhcpRadio.checked;
-  const dnsText = document.getElementById('dns-servers').value.trim();
+  const dnsInput = document.getElementById('dns-servers');
+  const dnsText = dnsInput ? dnsInput.value.trim() : '';
   const dns = dnsText ? dnsText.split(',').map(s => s.trim()).filter(s => s) : [];
-  
-  if (useDHCP) {
-    try {
-      await invoke('set_dhcp', { adapterName });
-      
-      // 如果在 DHCP 模式下指定了 DNS，则单独设置 DNS（覆盖 DHCP 下发的 DNS）
-      if (dns.length > 0) {
-        await invoke('set_dns_servers', { adapterName, dns });
-      }
-    } catch (error) {
-      const raw = String(error || '');
-      console.error('配置网络(DHCP)失败:', raw);
-      const short = raw.split('\n')[0] || raw;
-      alert(t('configFailed', { error: short }));
-    }
-    // 无论成功或失败，都先关闭窗口，再在后台静默刷新网络信息，避免界面卡顿
-    document.querySelector('.modal-overlay')?.remove();
-    refreshNetworkInfo().catch((err) => {
-      console.error('刷新网络信息失败:', err);
-    });
-  } else {
-    // 验证静态IP配置
-    const ip = document.getElementById('ip-address').value.trim();
-    const subnet = document.getElementById('subnet-mask').value.trim();
-    const gateway = document.getElementById('gateway').value.trim();
+
+  // 静态 IP 模式下，先在弹窗仍存在时完成所有表单读取与校验
+  let staticPayload = null;
+  if (!useDHCP) {
+    const ipInput = document.getElementById('ip-address');
+    const subnetInput = document.getElementById('subnet-mask');
+    const gatewayInput = document.getElementById('gateway');
+
+    const ip = ipInput ? ipInput.value.trim() : '';
+    const subnet = subnetInput ? subnetInput.value.trim() : '';
+    const gateway = gatewayInput ? gatewayInput.value.trim() : '';
     
     if (!ip || !subnet || !gateway) {
       alert(t('staticConfigIncomplete'));
@@ -503,25 +496,61 @@ window.saveNetworkConfig = async function(adapterName) {
       alert(t('ipFormatInvalid'));
       return;
     }
-    
-    try {
-      await invoke('set_static_ip', {
-        adapterName,
-        ip,
-        subnet,
-        gateway,
-        dns
-      });
-    } catch (error) {
-      const raw = String(error || '');
-      console.error('配置网络(静态IP)失败:', raw);
-      const short = raw.split('\n')[0] || raw;
-      alert(t('configFailed', { error: short }));
+
+    staticPayload = { ip, subnet, gateway, dns };
+  }
+
+  // 表单校验通过后，再立刻关闭当前配置窗口，提升交互响应速度
+  if (buttonEl && buttonEl.closest) {
+    const overlay = buttonEl.closest('.modal-overlay');
+    if (overlay) {
+      overlay.remove();
     }
-    // 无论成功或失败，都先关闭窗口，再在后台静默刷新网络信息，避免界面卡顿
-    document.querySelector('.modal-overlay')?.remove();
-    refreshNetworkInfo().catch((err) => {
-      console.error('刷新网络信息失败:', err);
-    });
+  } else {
+    // 兜底：没有拿到按钮节点时，仍然尝试移除任意配置弹窗
+    document.querySelector('.network-config-modal')?.closest('.modal-overlay')?.remove();
+  }
+
+  if (useDHCP) {
+    // 在后台异步执行 DHCP 配置和 DNS 设置
+    invoke('set_dhcp', { adapterName })
+      .then(() => {
+        if (dns.length > 0) {
+          return invoke('set_dns_servers', { adapterName, dns });
+        }
+      })
+      .catch((error) => {
+        const raw = String(error || '');
+        console.error('配置网络(DHCP)失败:', raw);
+        const short = raw.split('\n')[0] || raw;
+        alert(t('configFailed', { error: short }));
+      })
+      .finally(() => {
+        // 静默刷新网络信息，不阻塞界面
+        refreshNetworkInfo().catch((err) => {
+          console.error('刷新网络信息失败:', err);
+        });
+      });
+  } else {
+    // 在后台异步执行静态 IP 配置
+    invoke('set_static_ip', {
+      adapterName,
+      ip: staticPayload.ip,
+      subnet: staticPayload.subnet,
+      gateway: staticPayload.gateway,
+      dns: staticPayload.dns
+    })
+      .catch((error) => {
+        const raw = String(error || '');
+        console.error('配置网络(静态IP)失败:', raw);
+        const short = raw.split('\n')[0] || raw;
+        alert(t('configFailed', { error: short }));
+      })
+      .finally(() => {
+        // 静默刷新网络信息，不阻塞界面
+        refreshNetworkInfo().catch((err) => {
+          console.error('刷新网络信息失败:', err);
+        });
+      });
   }
 };

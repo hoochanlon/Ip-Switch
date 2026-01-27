@@ -489,8 +489,15 @@ pub async fn set_static_ip(
         .args(&[
             "-Command",
             &format!(
-                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; New-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -NextHop {} -ErrorAction Stop",
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; \
+                 $existing = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1; \
+                 if ($existing) {{ \
+                   Set-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -NextHop {} -ErrorAction Stop \
+                 }} else {{ \
+                   New-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -NextHop {} -ErrorAction Stop \
+                 }}",
                 adapter_name.replace("'", "''"),
+                gateway,
                 gateway
             )
         ])
