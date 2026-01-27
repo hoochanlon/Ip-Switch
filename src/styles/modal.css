@@ -83,7 +83,7 @@
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
   padding: 20px;
   border-top: 1px solid var(--border-color);
@@ -145,10 +145,6 @@
 /* 表单样式 */
 .form-group {
   margin-bottom: 26px;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
 }
 
 .form-group label {

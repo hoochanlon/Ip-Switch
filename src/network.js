@@ -357,7 +357,7 @@ function renderFullMode(container) {
           <span class="value">${adapter.gateway || t('notConfigured')}</span>
         </div>
         <div class="detail-row dns-row">
-          <span class="label">DNS:</span>
+          <span class="label">${t('dnsServers')}</span>
           <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
         </div>
       </div>
@@ -475,14 +475,17 @@ window.saveNetworkConfig = async function(adapterName) {
       if (dns.length > 0) {
         await invoke('set_dns_servers', { adapterName, dns });
       }
-      
-      const suffix = dns.length > 0 ? t('dhcpDnsSuffix') : '';
-      alert(t('switchToDhcpOk', { suffix }));
-      await refreshNetworkInfo();
-      document.querySelector('.modal-overlay')?.remove();
     } catch (error) {
-      alert(t('configFailed', { error }));
+      const raw = String(error || '');
+      console.error('配置网络(DHCP)失败:', raw);
+      const short = raw.split('\n')[0] || raw;
+      alert(t('configFailed', { error: short }));
     }
+    // 无论成功或失败，都先关闭窗口，再在后台静默刷新网络信息，避免界面卡顿
+    document.querySelector('.modal-overlay')?.remove();
+    refreshNetworkInfo().catch((err) => {
+      console.error('刷新网络信息失败:', err);
+    });
   } else {
     // 验证静态IP配置
     const ip = document.getElementById('ip-address').value.trim();
@@ -509,11 +512,16 @@ window.saveNetworkConfig = async function(adapterName) {
         gateway,
         dns
       });
-      alert(t('staticConfigOk'));
-      await refreshNetworkInfo();
-      document.querySelector('.modal-overlay')?.remove();
     } catch (error) {
-      alert(t('configFailed', { error }));
+      const raw = String(error || '');
+      console.error('配置网络(静态IP)失败:', raw);
+      const short = raw.split('\n')[0] || raw;
+      alert(t('configFailed', { error: short }));
     }
+    // 无论成功或失败，都先关闭窗口，再在后台静默刷新网络信息，避免界面卡顿
+    document.querySelector('.modal-overlay')?.remove();
+    refreshNetworkInfo().catch((err) => {
+      console.error('刷新网络信息失败:', err);
+    });
   }
 };

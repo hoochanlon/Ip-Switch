@@ -270,17 +270,5 @@ function setupEventListeners() {
   }
 }
 
-// 点击遮罩层关闭对话框
-document.addEventListener('DOMContentLoaded', () => {
-  const aboutModal = document.getElementById('about-modal');
-  if (aboutModal) {
-    aboutModal.addEventListener('click', (e) => {
-      if (e.target === aboutModal) {
-        closeAboutModal();
-      }
-    });
-  }
-});
-
 // 启动应用
 init();

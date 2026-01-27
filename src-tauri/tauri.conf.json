@@ -29,7 +29,9 @@
         {
           "identifier": "main-capability",
           "description": "Main window capabilities",
-          "windows": ["main"],
+          "windows": [
+            "main"
+          ],
           "permissions": [
             "core:window:allow-minimize",
             "core:window:allow-maximize",
