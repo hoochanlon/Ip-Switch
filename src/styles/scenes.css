@@ -6,6 +6,11 @@
   margin-bottom: 8px;
 }
 
+.auto-switch-control.enabled {
+  border-color: var(--btn-primary-bg);
+  box-shadow: 0 0 0 1px rgba(72, 187, 120, 0.4);
+}
+
 .auto-switch-control .checkbox-label {
   margin: 0;
   font-size: 14px;

@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>IP 配置管理器</title>
+    <title>IP Switch</title>
   </head>
   <body>
     <!-- 自定义标题栏 -->
     <div id="window-titlebar" class="window-titlebar">
       <div class="titlebar-left">
         <img class="app-logo-small" src="/imgs/ico/logo.png" alt="IP Switch" />
-        <span class="titlebar-title">IP 配置管理器</span>
+        <span class="titlebar-title">IP Switch</span>
       </div>
       <div class="titlebar-controls">
         <button id="window-minimize" class="titlebar-button" aria-label="最小化" onclick="window.handleMinimize(event)">
@@ -37,7 +37,7 @@
         <div class="header">
           <div class="app-title">
             <img class="app-logo" src="/imgs/ico/logo.png" alt="IP Switch" />
-            <h1>IP 配置管理器</h1>
+            <h1>IP Switch</h1>
           </div>
           
           <!-- 状态指示器 -->
@@ -52,16 +52,6 @@
           </div>
           
           <div class="header-actions">
-            <div class="view-mode-toggle">
-              <label class="radio-label">
-                <input type="radio" name="view-mode" value="simple" id="view-mode-simple" checked onchange="switchViewMode()">
-                <span>简约模式</span>
-              </label>
-              <label class="radio-label">
-                <input type="radio" name="view-mode" value="full" id="view-mode-full" onchange="switchViewMode()">
-                <span>完全模式</span>
-              </label>
-            </div>
             <button id="refresh-btn" class="btn btn-ghost">
               <img class="btn-icon" src="/imgs/svg/common/refresh.svg" alt="" />
               刷新
@@ -127,10 +117,10 @@
                 </div>
               </div>
               <div class="auto-switch-control">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="auto-switch-checkbox">
-                  <span>内外网自动切换</span>
-                </label>
+                <span style="margin-right: 8px;">自动双向切换</span>
+                <button id="auto-switch-config-btn" class="btn btn-sm" type="button">
+                  配置
+                </button>
               </div>
               <div id="scenes-list"></div>
             </div>
@@ -148,7 +138,7 @@
         </div>
         <div class="modal-body">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h3 style="color: #667eea; margin-bottom: 10px;">IP 配置管理器</h3>
+            <h3 style="color: #667eea; margin-bottom: 10px;">IP Switch</h3>
             <p style="color: #718096; margin-bottom: 5px;">版本: 1.0.0</p>
             <p style="color: #718096; font-size: 14px;">一个便捷的 IP、Hosts、代理配置管理工具</p>
           </div>

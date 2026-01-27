@@ -110,20 +110,20 @@
 
 .network-details {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
   margin-bottom: 12px;
 }
 
 .detail-row {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .detail-row .label {
   font-weight: 500;
   color: var(--text-tertiary);
-  min-width: 80px;
+  min-width: 40px;
 }
 
 .detail-row .value {
@@ -131,29 +131,25 @@
   word-break: break-all;
 }
 
-/* 视图模式切换 */
-.view-mode-toggle {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  padding: 8px 15px;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  margin-right: 10px;
+/* DNS：单行显示，可横向滚动查看全部内容 */
+.dns-row .value {
+  word-break: normal;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-overflow: clip;
 }
 
-.view-mode-toggle .radio-label {
-  margin: 0;
-  padding: 0;
+/* DNS 行更紧凑一些（避免横向滚动条占太多空间） */
+
+.dns-row .value::-webkit-scrollbar {
+  height: 8px;
 }
 
-.view-mode-toggle .radio-label:hover {
-  background: transparent;
-}
-
-/* 简约模式卡片样式 */
-.simple-card {
-  margin-bottom: 15px;
+.dns-row .value::-webkit-scrollbar-thumb {
+  background: rgba(113, 128, 150, 0.35);
+  border-radius: 10px;
 }
 
 .network-details-simple {

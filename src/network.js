@@ -26,7 +26,36 @@ export async function refreshNetworkInfo(showLoading = false) {
       return;
     }
     
-    // 直接渲染，不显示加载提示
+    // 默认初始化筛选：第一次加载时仅勾选主要网卡（WiFi + 以太网）
+    if (state.selectedNetworkAdapters === null && Array.isArray(state.currentNetworkInfo)) {
+      const mainAdapters = state.currentNetworkInfo.filter(adapter => {
+        const name = adapter.name.toLowerCase();
+        const networkType = (adapter.network_type || '').toLowerCase();
+
+        if (networkType === 'bluetooth' || name.includes('bluetooth')) {
+          return false;
+        }
+
+        const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+        const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
+
+        const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
+        const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
+          name.includes('ethernet') ||
+          name.includes('以太网') ||
+          (name.includes('lan') && !isVirtual && !name.includes('wlan'))
+        ));
+
+        return (isWifi || isEthernet) && !isVirtual;
+      });
+
+      if (mainAdapters.length > 0) {
+        const names = new Set(mainAdapters.map(a => a.name));
+        state.setSelectedNetworkAdapters(names);
+      }
+    }
+
+    // 渲染列表
     renderNetworkInfo();
 
     // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
@@ -50,23 +79,19 @@ export function renderNetworkInfo() {
   const container = document.getElementById('network-info');
   container.innerHTML = '';
 
-  // 完全模式下：让网络卡片列表区域单独可滚动（标题/筛选栏固定）
+  // 让网络卡片列表区域单独可滚动（标题/筛选栏固定）
   const networkSection = container.closest('.network-section');
   if (networkSection) {
-    networkSection.classList.toggle('full-mode', state.viewMode === 'full');
+    networkSection.classList.add('full-mode');
   }
 
-  // 在完全模式下显示筛选控件
+  // 显示筛选控件
   const filterContainer = document.getElementById('network-filter-container');
   if (filterContainer) {
-    filterContainer.style.display = state.viewMode === 'full' ? 'flex' : 'none';
+    filterContainer.style.display = 'flex';
   }
 
-  if (state.viewMode === 'simple') {
-    renderSimpleMode(container);
-  } else {
-    renderFullMode(container);
-  }
+  renderFullMode(container);
 }
 
 // 初始化网络筛选功能
@@ -235,58 +260,6 @@ export function initNetworkFilter() {
   });
 }
 
-// 简约模式：只显示主要网卡（WiFi和真实以太网）
-function renderSimpleMode(container) {
-  // 过滤掉虚拟网卡和蓝牙，只保留主要网卡
-  const mainAdapters = state.currentNetworkInfo.filter(adapter => {
-    const name = adapter.name.toLowerCase();
-    const networkType = (adapter.network_type || '').toLowerCase();
-    
-    // 明确排除蓝牙网络
-    if (networkType === 'bluetooth' || name.includes('bluetooth')) {
-      return false;
-    }
-    
-    // 排除虚拟网卡
-    const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
-    const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
-    
-    // 只保留WiFi和以太网（包括以太网、以太网1、以太网2等）
-    const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
-    const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
-      name.includes('ethernet') || 
-      name.includes('以太网') ||
-      (name.includes('lan') && !isVirtual && !name.includes('wlan'))
-    ));
-    
-    return (isWifi || isEthernet) && !isVirtual;
-  });
-  
-  // 按类型分组
-  const wifiAdapters = mainAdapters.filter(a => a.is_wireless);
-  const ethernetAdapters = mainAdapters.filter(a => !a.is_wireless);
-  
-  // WiFi显示
-  if (wifiAdapters.length > 0) {
-    wifiAdapters.forEach(adapter => {
-      const card = createSimpleCard(adapter);
-      container.appendChild(card);
-    });
-  }
-  
-  // 以太网显示（包括以太网、以太网1、以太网2等）
-  if (ethernetAdapters.length > 0) {
-    ethernetAdapters.forEach(adapter => {
-      const card = createSimpleCard(adapter);
-      container.appendChild(card);
-    });
-  }
-  
-  if (wifiAdapters.length === 0 && ethernetAdapters.length === 0) {
-    container.innerHTML = '<div style="text-align: center; padding: 20px; color: #718096;">未检测到主要网络适配器</div>';
-  }
-}
-
 // 获取网络类型图标和标签
 export function getNetworkTypeInfo(networkType) {
   const types = {
@@ -299,49 +272,7 @@ export function getNetworkTypeInfo(networkType) {
   return types[networkType] || types['other'];
 }
 
-// 创建简约模式卡片（单个适配器）
-function createSimpleCard(adapter) {
-  const card = document.createElement('div');
-  const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
-  card.className = `network-card simple-card ${typeInfo.class}-card`;
-  
-  const ipType = adapter.is_dhcp ? '动态IP (DHCP)' : '静态IP';
-  const status = adapter.is_enabled ? '已连接' : '未连接';
-  
-  card.innerHTML = `
-    <div class="network-header">
-      <div>
-        <h3>${adapter.name}</h3>
-        <span class="network-type-badge ${typeInfo.class}">
-          <img src="${typeInfo.icon}" alt="${typeInfo.label}" class="network-icon">
-          ${typeInfo.label}
-        </span>
-      </div>
-      <span class="status-badge ${adapter.is_enabled ? 'enabled' : 'disabled'}">${status}</span>
-    </div>
-    <div class="network-details-simple">
-      <div class="detail-row">
-        <span class="label">IP类型:</span>
-        <span class="value">${ipType}</span>
-      </div>
-      <div class="detail-row">
-        <span class="label">IP地址:</span>
-        <span class="value">${adapter.ip_address || '未配置'}</span>
-      </div>
-      <div class="detail-row">
-        <span class="label">网关:</span>
-        <span class="value">${adapter.gateway || '未配置'}</span>
-      </div>
-      <div class="detail-row">
-        <span class="label">DNS:</span>
-        <span class="value">${adapter.dns_servers?.join(', ') || '未配置'}</span>
-      </div>
-    </div>
-    <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">配置网络</button>
-  `;
-  
-  return card;
-}
+// 简约模式已移除，仅保留完全模式显示
 
 // 完全模式：显示所有适配器详情
 function renderFullMode(container) {
@@ -389,7 +320,7 @@ function renderFullMode(container) {
     const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
     card.className = `network-card ${typeInfo.class}-card`;
     
-    const ipType = adapter.is_dhcp ? '动态IP (DHCP)' : '静态IP';
+    const ipType = adapter.is_dhcp ? 'DHCP' : '静态IP';
     const status = adapter.is_enabled ? '已连接' : '未连接';
     
     card.innerHTML = `
@@ -405,8 +336,12 @@ function renderFullMode(container) {
       </div>
       <div class="network-details">
         <div class="detail-row">
-          <span class="label">IP类型:</span>
+          <span class="label">IP状态:</span>
           <span class="value">${ipType}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">MAC地址:</span>
+          <span class="value">${adapter.mac_address || '未知'}</span>
         </div>
         <div class="detail-row">
           <span class="label">IP地址:</span>
@@ -420,13 +355,9 @@ function renderFullMode(container) {
           <span class="label">网关:</span>
           <span class="value">${adapter.gateway || '未配置'}</span>
         </div>
-        <div class="detail-row">
+        <div class="detail-row dns-row">
           <span class="label">DNS:</span>
-          <span class="value">${adapter.dns_servers?.join(', ') || '未配置'}</span>
-        </div>
-        <div class="detail-row">
-          <span class="label">MAC地址:</span>
-          <span class="value">${adapter.mac_address || '未知'}</span>
+          <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || '未配置'}</span>
         </div>
       </div>
       <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">配置网络</button>

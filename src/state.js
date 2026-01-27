@@ -1,7 +1,7 @@
 // 应用状态管理
 
 export let currentNetworkInfo = null;
-export let viewMode = 'simple'; // 'simple' 或 'full'
+export let viewMode = 'full'; // 仅保留完全模式
 export let scenes = [];
 export let currentScene = null;
 export let networkStatus = null;
@@ -18,6 +18,7 @@ export function initSelectedNetworkAdapters() {
   try {
     const raw = localStorage.getItem('selectedNetworkAdapters');
     if (!raw) {
+      // 默认按“主要网卡”初始化（WiFi + 以太网），实际列表在第一次刷新网络信息后由 network.js 设置
       selectedNetworkAdapters = null;
       return;
     }
@@ -49,9 +50,9 @@ export function isAdapterSelected(adapterName) {
   return selectedNetworkAdapters.has(adapterName);
 }
 
-// 设置视图模式
+// 视图模式固定为完全模式，保留函数以避免调用报错
 export function setViewMode(mode) {
-  viewMode = mode;
+  viewMode = 'full';
   localStorage.setItem('viewMode', viewMode);
 }
 

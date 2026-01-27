@@ -45,6 +45,8 @@ export function initAutoSwitch() {
         };
         localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
       }
+      // 初始化时更新指示样式
+      updateAutoSwitchCheckbox();
       if (autoSwitchConfig.enabled) {
         startAutoSwitch();
       }
@@ -113,11 +115,15 @@ function initAutoSwitchCheckbox() {
   });
 }
 
-// 更新复选框状态
+// 更新自动切换外层指示样式
 export function updateAutoSwitchCheckbox() {
-  const checkbox = document.getElementById('auto-switch-checkbox');
-  if (checkbox) {
-    checkbox.checked = autoSwitchConfig && autoSwitchConfig.enabled || false;
+  const container = document.querySelector('.auto-switch-control');
+  if (container) {
+    if (autoSwitchConfig && autoSwitchConfig.enabled) {
+      container.classList.add('enabled');
+    } else {
+      container.classList.remove('enabled');
+    }
   }
 }
 
@@ -308,7 +314,7 @@ export function getAutoSwitchConfig() {
 // 显示自动切换配置对话框
 export function showAutoSwitchConfig(fromCheckbox = false) {
   const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
+  modal.className = 'modal-overlay auto-switch-modal-overlay';
   
   // 保存对话框打开前的复选框状态（如果是从复选框打开的）
   const checkboxStateBeforeOpen = fromCheckbox ? 
@@ -519,20 +525,6 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
     modal.remove();
   });
   
-  // 监听遮罩层点击
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      if (fromCheckbox && checkboxStateBeforeOpen === false) {
-        // 如果是从未选中的复选框打开的，关闭时恢复为未选中
-        const checkbox = document.getElementById('auto-switch-checkbox');
-        if (checkbox) {
-          checkbox.checked = false;
-        }
-      }
-      modal.remove();
-    }
-  });
-  
   document.body.appendChild(modal);
   
   // 设置默认选中
@@ -561,7 +553,7 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
 
 // 取消自动切换配置
 window.cancelAutoSwitchConfig = function(fromCheckbox, checkboxStateBeforeOpen) {
-  const modal = document.querySelector('.modal-overlay');
+  const modal = document.querySelector('.auto-switch-modal-overlay');
   if (modal) {
     if (fromCheckbox && checkboxStateBeforeOpen === false) {
       // 如果是从未选中的复选框打开的，关闭时恢复为未选中
@@ -671,8 +663,7 @@ window.saveAutoSwitchConfig = function() {
   };
   
   setAutoSwitchConfig(config);
-  document.querySelector('.modal-overlay')?.remove();
-  alert('自动切换配置已保存');
+  document.querySelector('.auto-switch-modal-overlay')?.remove();
   
   // 如果启用了自动切换，更新复选框状态
   if (config.enabled) {

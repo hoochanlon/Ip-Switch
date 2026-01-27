@@ -20,13 +20,6 @@ async function init() {
   // 初始化网卡筛选勾选状态
   state.initSelectedNetworkAdapters();
   
-  // 从本地存储读取视图模式
-  const savedMode = localStorage.getItem('viewMode');
-  if (savedMode) {
-    state.setViewMode(savedMode);
-    document.getElementById(`view-mode-${savedMode}`).checked = true;
-  }
-  
   // 从本地存储读取当前场景
   const savedScene = localStorage.getItem('currentScene');
   if (savedScene) {
@@ -210,13 +203,6 @@ export async function checkNetworkStatusWithBackend() {
   }
 }
 
-// 切换视图模式
-window.switchViewMode = function() {
-  const simpleRadio = document.getElementById('view-mode-simple');
-  state.setViewMode(simpleRadio.checked ? 'simple' : 'full');
-  renderNetworkInfo();
-};
-
 // 将函数挂载到 window 对象以便全局访问
 window.editHosts = editHosts;
 window.editProxy = editProxy;
@@ -252,6 +238,11 @@ function setupEventListeners() {
   }
   if (importBtn) {
     importBtn.addEventListener('click', window.importScenesConfig);
+  }
+
+  const autoSwitchConfigBtn = document.getElementById('auto-switch-config-btn');
+  if (autoSwitchConfigBtn) {
+    autoSwitchConfigBtn.addEventListener('click', () => showAutoSwitchConfig(false));
   }
 }
 
