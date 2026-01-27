@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import NetworkStatus from './network-status.js';
 import { initTheme, toggleTheme } from './theme.js';
 import * as state from './state.js';
-import { refreshNetworkInfo, renderNetworkInfo } from './network.js';
+import { refreshNetworkInfo, renderNetworkInfo, initNetworkFilter } from './network.js';
 import { loadScenes, renderScenes } from './scenes.js';
 import { editHosts } from './hosts.js';
 import { editProxy } from './proxy.js';
@@ -16,6 +16,9 @@ import { initWindowControls, initWindowDrag } from './window-controls.js';
 async function init() {
   // 初始化主题
   initTheme();
+
+  // 初始化网卡筛选勾选状态
+  state.initSelectedNetworkAdapters();
   
   // 从本地存储读取视图模式
   const savedMode = localStorage.getItem('viewMode');
@@ -69,6 +72,9 @@ async function init() {
   // 初始化窗口控制功能
   await initWindowControls();
   await initWindowDrag();
+  
+  // 初始化网络筛选功能
+  initNetworkFilter();
 }
 
 // 初始化网络状态检测

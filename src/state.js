@@ -6,10 +6,47 @@ export let scenes = [];
 export let currentScene = null;
 export let networkStatus = null;
 export let lastTrayColor = null; // 保存上次的托盘颜色，用于网络恢复时恢复
+export let selectedNetworkAdapters = null; // Set<string> | null（null 表示全选/不做勾选过滤）
 
 // 设置网络信息
 export function setCurrentNetworkInfo(info) {
   currentNetworkInfo = info;
+}
+
+// 初始化网卡勾选筛选（从本地存储恢复）
+export function initSelectedNetworkAdapters() {
+  try {
+    const raw = localStorage.getItem('selectedNetworkAdapters');
+    if (!raw) {
+      selectedNetworkAdapters = null;
+      return;
+    }
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      selectedNetworkAdapters = new Set(arr.filter(Boolean));
+    } else {
+      selectedNetworkAdapters = null;
+    }
+  } catch {
+    selectedNetworkAdapters = null;
+  }
+}
+
+// 设置选中的网卡集合（传 null 表示全选）
+export function setSelectedNetworkAdapters(value) {
+  if (value === null) {
+    selectedNetworkAdapters = null;
+    localStorage.removeItem('selectedNetworkAdapters');
+    return;
+  }
+  selectedNetworkAdapters = new Set(Array.from(value || []).filter(Boolean));
+  localStorage.setItem('selectedNetworkAdapters', JSON.stringify(Array.from(selectedNetworkAdapters)));
+}
+
+export function isAdapterSelected(adapterName) {
+  if (!adapterName) return false;
+  if (selectedNetworkAdapters === null) return true; // 全选
+  return selectedNetworkAdapters.has(adapterName);
 }
 
 // 设置视图模式

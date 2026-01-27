@@ -85,10 +85,18 @@
         
         <div class="main-content">
           <div class="network-section">
-            <h2 class="section-title">
-              <img class="section-icon" src="/imgs/svg/status/status.svg" alt="" />
-              网络状态
-            </h2>
+            <div class="network-section-header">
+              <h2 class="section-title">
+                <img class="section-icon" src="/imgs/svg/status/status.svg" alt="" />
+                网络状态
+              </h2>
+              <div id="network-filter-container" class="network-filter-container" style="display: none;">
+                <input type="text" id="network-filter-input" class="network-filter-input" placeholder="搜索网卡名称..." />
+                <button id="network-filter-btn" class="btn btn-sm btn-ghost network-filter-toggle">
+                  <img class="btn-icon" src="/imgs/svg/common/filter.svg" alt="筛选" />
+                </button>
+              </div>
+            </div>
             <div id="network-info"></div>
           </div>
           

@@ -1,0 +1,167 @@
+/* ============================================
+   网络筛选样式
+   ============================================ */
+
+.network-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.network-filter-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.network-filter-input {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 200px;
+  transition: all 0.2s ease;
+}
+
+.network-filter-input:focus {
+  outline: none;
+  border-color: var(--btn-primary-bg);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.network-filter-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.network-filter-toggle {
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Excel 风格：网卡筛选下拉面板
+   ============================================ */
+
+.network-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 320px;
+  max-width: min(320px, 80vw);
+  max-height: 360px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.network-filter-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.network-filter-dropdown-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.network-filter-dropdown-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.network-filter-dropdown-body {
+  padding: 8px 6px;
+}
+
+.network-filter-dropdown-list {
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.network-filter-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.network-filter-item:hover {
+  background: var(--bg-secondary);
+}
+
+.network-filter-checkbox {
+  margin-top: 2px;
+}
+
+.network-filter-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.network-filter-item-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.network-filter-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 深色模式下的筛选输入框 */
+[data-theme="dark"] .network-filter-input {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .network-filter-input:focus {
+  border-color: var(--btn-primary-bg);
+}
+
+/* 响应式：小屏幕时调整筛选框宽度 */
+@media (max-width: 768px) {
+  .network-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .network-filter-container {
+    width: 100%;
+  }
+  
+  .network-filter-input {
+    flex: 1;
+    width: auto;
+  }
+
+  .network-filter-dropdown {
+    width: 100%;
+    right: 0;
+    left: 0;
+    max-width: none;
+  }
+}
