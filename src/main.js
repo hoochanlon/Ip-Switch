@@ -11,7 +11,7 @@ import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAbou
 import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
 import { initHostsScheduledUpdate } from './hosts.js';
 import { initWindowControls, initWindowDrag } from './window-controls.js';
-import { initI18n, toggleLanguage } from './i18n.js';
+import { initI18n, toggleLanguage, getLanguage } from './i18n.js';
 
 // 初始化
 async function init() {
@@ -227,7 +227,21 @@ function setupEventListeners() {
   // 语言切换按钮
   const langToggleBtn = document.getElementById('lang-toggle-btn');
   if (langToggleBtn) {
-    langToggleBtn.addEventListener('click', toggleLanguage);
+    langToggleBtn.addEventListener('click', () => {
+      toggleLanguage();
+      // 根据当前语言切换图标
+      try {
+        const langIcon = document.getElementById('lang-icon');
+        if (langIcon) {
+          const currentLang = getLanguage();
+          langIcon.src = currentLang === 'zh'
+            ? '/imgs/svg/common/translation.svg'
+            : '/imgs/svg/common/translation-1.svg';
+        }
+      } catch {
+        // 忽略图标更新错误
+      }
+    });
   }
   
   // 主题切换按钮
