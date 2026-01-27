@@ -595,101 +595,123 @@ pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {
     Ok(output_str.contains("SUCCESS"))
 }
 
-/// 自动切换网络配置（双向切换）
-#[tauri::command]
-pub async fn auto_switch_network(
-    adapter_name: String,
-    dhcp_config: Option<DhcpConfig>,
-    static_config: Option<StaticConfig>,
-    dhcp_ping_target: String,      // DHCP模式下的ping目标（如baidu.com）
-    static_ping_target: String,    // 静态IP模式下的ping目标（如网关IP）
-) -> Result<String, String> {
-    // 获取当前网络配置
-    let current_info = get_network_info().await?;
-    let adapter = current_info.iter()
-        .find(|a| a.name == adapter_name)
-        .ok_or_else(|| format!("找不到网卡: {}", adapter_name))?;
-    
-    let current_is_dhcp = adapter.is_dhcp;
-    
-    // 同时测试两个ping目标，判断网络状态
-    let dhcp_can_ping = ping_test(dhcp_ping_target.clone(), 3).await.unwrap_or(false);
-    let static_can_ping = ping_test(static_ping_target.clone(), 3).await.unwrap_or(false);
-    
-    // 根据当前模式和ping结果进行切换
-    if current_is_dhcp {
-        // 当前是DHCP模式
-        if dhcp_can_ping {
-            // 可以ping通外网，保持DHCP模式
-            return Ok("保持DHCP模式 (可以ping通外网)".to_string());
-        } else {
-            // 无法ping通外网
-            if static_can_ping {
-                // 内网可以ping通，切换到静态IP
-                if let Some(static_cfg) = static_config {
-                    set_static_ip(
-                        adapter_name.clone(),
-                        static_cfg.ip,
-                        static_cfg.subnet,
-                        static_cfg.gateway,
-                        static_cfg.dns.unwrap_or_default(),
-                    ).await?;
-                    return Ok(format!("已从DHCP切换到静态IP (无法ping通外网 {}, 但可以ping通内网 {})", dhcp_ping_target, static_ping_target));
-                } else {
-                    return Err("静态IP配置未提供".to_string());
-                }
-            } else {
-                // 双方都ping不通，保持当前模式并提示异常
-                return Ok(format!("保持DHCP模式 (异常: 外网 {} 和内网 {} 都无法ping通)", dhcp_ping_target, static_ping_target));
-            }
-        }
-    } else {
-        // 当前是静态IP模式
-        if static_can_ping {
-            // 可以ping通内网，保持静态IP模式
-            return Ok("保持静态IP模式 (可以ping通内网)".to_string());
-        } else {
-            // 无法ping通内网
-            if dhcp_can_ping {
-                // 外网可以ping通，切换到DHCP
-                if let Some(dhcp_cfg) = dhcp_config {
-                    set_dhcp(adapter_name.clone()).await?;
-                    
-                    // 如果提供了DHCP的DNS配置，设置DNS
-                    if let Some(dns) = dhcp_cfg.dns {
-                        if !dns.is_empty() {
-                            let dns_str = dns.join(",");
-                            let _ = Command::new("powershell")
-                                .args(&[
-                                    "-Command",
-                                    &format!(
-                                        "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {} -ErrorAction SilentlyContinue",
-                                        adapter_name.replace("'", "''"),
-                                        dns_str.replace("'", "''")
-                                    )
-                                ])
-                                .output();
-                        }
-                    }
-                    
-                    return Ok(format!("已从静态IP切换到DHCP (无法ping通内网 {}, 但可以ping通外网 {})", static_ping_target, dhcp_ping_target));
-                } else {
-                    return Err("DHCP配置未提供".to_string());
-                }
-            } else {
-                // 双方都ping不通，保持当前模式并提示异常
-                return Ok(format!("保持静态IP模式 (异常: 内网 {} 和外网 {} 都无法ping通)", static_ping_target, dhcp_ping_target));
-            }
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkConfig {
+    pub mode: String, // "dhcp" | "static"
+    pub dhcp: Option<DhcpConfig>,
+    #[serde(rename = "staticConfig")]
+    pub static_config: Option<StaticConfig>,
+    pub ping_target: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoSwitchResult {
+    pub message: String,
+    pub active_network: String, // "network1" | "network2"
+    pub result: String,         // "stay" | "switched" | "both_failed"
+}
+
+/// 自动切换网络配置（双向切换，双方均可独立选择DHCP或静态）
+#[tauri::command]
+pub async fn auto_switch_network(
+    adapter_name: String,
+    current_active: Option<String>, // "network1" | "network2"
+    network1_config: NetworkConfig,
+    network2_config: NetworkConfig,
+) -> Result<AutoSwitchResult, String> {
+    // 先探测当前网卡是否存在
+    let current_info = get_network_info().await?;
+    let _ = current_info.iter()
+        .find(|a| a.name == adapter_name)
+        .ok_or_else(|| format!("找不到网卡: {}", adapter_name))?;
+
+    let active = current_active.unwrap_or_else(|| "network1".to_string());
+    let (current_label, other_label, current_cfg, other_cfg) = if active == "network2" {
+        ("网络2", "网络1", network2_config.clone(), network1_config.clone())
+    } else {
+        ("网络1", "网络2", network1_config.clone(), network2_config.clone())
+    };
+
+    // 1. 先检测当前侧
+    let current_ok = ping_test(current_cfg.ping_target.clone(), 3).await.unwrap_or(false);
+    if current_ok {
+        return Ok(AutoSwitchResult {
+            message: format!("保持{} (连接正常)", current_label),
+            active_network: if active == "network2" { "network2".to_string() } else { "network1".to_string() },
+            result: "stay".to_string(),
+        });
+    }
+
+    // 2. 切换到另一侧并检测
+    apply_network_config(&adapter_name, &other_cfg).await?;
+    let other_ok = ping_test(other_cfg.ping_target.clone(), 3).await.unwrap_or(false);
+    if other_ok {
+        return Ok(AutoSwitchResult {
+            message: format!("已切换到{} (原{}不可用)", other_label, current_label),
+            active_network: if active == "network2" { "network1".to_string() } else { "network2".to_string() },
+            result: "switched".to_string(),
+        });
+    }
+
+    // 3. 两侧都不通，回退到原侧
+    let _ = apply_network_config(&adapter_name, &current_cfg).await;
+    Ok(AutoSwitchResult {
+        message: format!("异常：{} 与 {} 都无法ping通，已回退到{}", current_label, other_label, current_label),
+        active_network: if active == "network2" { "network2".to_string() } else { "network1".to_string() },
+        result: "both_failed".to_string(),
+    })
+}
+
+async fn apply_network_config(adapter_name: &str, cfg: &NetworkConfig) -> Result<(), String> {
+    match cfg.mode.as_str() {
+        "dhcp" => {
+            set_dhcp(adapter_name.to_string()).await?;
+
+            if let Some(dhcp_cfg) = &cfg.dhcp {
+                if let Some(dns) = &dhcp_cfg.dns {
+                    if !dns.is_empty() {
+                        let dns_str = dns.join(",");
+                        let _ = Command::new("powershell")
+                            .args(&[
+                                "-Command",
+                                &format!(
+                                    "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ServerAddresses {} -ErrorAction SilentlyContinue",
+                                    adapter_name.replace("'", "''"),
+                                    dns_str.replace("'", "''")
+                                )
+                            ])
+                            .output();
+                    }
+                }
+            }
+        }
+        "static" => {
+            if let Some(static_cfg) = &cfg.static_config {
+                set_static_ip(
+                    adapter_name.to_string(),
+                    static_cfg.ip.clone(),
+                    static_cfg.subnet.clone(),
+                    static_cfg.gateway.clone(),
+                    static_cfg.dns.clone().unwrap_or_default(),
+                ).await?;
+            } else {
+                return Err("静态IP配置未提供".to_string());
+            }
+        }
+        other => return Err(format!("未知的模式: {}", other)),
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DhcpConfig {
     pub dns: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StaticConfig {
     pub ip: String,
     pub subnet: String,

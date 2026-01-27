@@ -17,6 +17,34 @@ export function initAutoSwitch() {
   if (savedConfig) {
     try {
       autoSwitchConfig = JSON.parse(savedConfig);
+      // 兼容旧配置格式（外网=DHCP，内网=静态）
+      if (!autoSwitchConfig.network1 || !autoSwitchConfig.network2) {
+        autoSwitchConfig = {
+          enabled: !!autoSwitchConfig.enabled,
+          adapterName: autoSwitchConfig.adapterName,
+          currentActive: 'network1',
+          network1: {
+            mode: 'dhcp',
+            dhcp: { dns: autoSwitchConfig.dhcpConfig?.dns || ['192.168.1.250', '114.114.114.114'] },
+            staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+            pingTarget: autoSwitchConfig.dhcpPingTarget || 'baidu.com',
+            trayColor: autoSwitchConfig.dhcpTrayColor || '#00FF00'
+          },
+          network2: {
+            mode: 'static',
+            dhcp: { dns: [] },
+            staticConfig: {
+              ip: autoSwitchConfig.staticConfig?.ip || '172.16.1.55',
+              subnet: autoSwitchConfig.staticConfig?.subnet || '255.255.255.0',
+              gateway: autoSwitchConfig.staticConfig?.gateway || '172.16.1.254',
+              dns: autoSwitchConfig.staticConfig?.dns || ['172.16.1.6']
+            },
+            pingTarget: autoSwitchConfig.staticPingTarget || autoSwitchConfig.staticConfig?.gateway || '172.16.1.254',
+            trayColor: autoSwitchConfig.staticTrayColor || '#FFA500'
+          }
+        };
+        localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+      }
       if (autoSwitchConfig.enabled) {
         startAutoSwitch();
       }
@@ -151,49 +179,72 @@ function checkEthernetStatusChange() {
   }
 }
 
+// 规范化单侧配置，填充默认值
+function normalizeNetworkConfig(cfg, defaults) {
+  const base = cfg || {};
+  return {
+    mode: base.mode || defaults.mode,
+    dhcp: base.dhcp || defaults.dhcp,
+    staticConfig: base.staticConfig || defaults.staticConfig,
+    pingTarget: base.pingTarget || defaults.pingTarget,
+    trayColor: base.trayColor || defaults.trayColor
+  };
+}
+
 // 执行自动切换
 async function performAutoSwitch() {
   if (!autoSwitchConfig || !autoSwitchConfig.enabled) {
     return;
   }
   
+  const network1Defaults = {
+    mode: 'dhcp',
+    dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+    staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+    pingTarget: 'baidu.com',
+    trayColor: '#00FF00'
+  };
+  const network2Defaults = {
+    mode: 'static',
+    dhcp: { dns: [] },
+    staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
+    pingTarget: '172.16.1.254',
+    trayColor: '#FFA500'
+  };
+
+  const network1Config = normalizeNetworkConfig(autoSwitchConfig.network1, network1Defaults);
+  const network2Config = normalizeNetworkConfig(autoSwitchConfig.network2, network2Defaults);
+
   try {
     const result = await invoke('auto_switch_network', {
       adapterName: autoSwitchConfig.adapterName,
-      dhcpConfig: autoSwitchConfig.dhcpConfig,
-      staticConfig: autoSwitchConfig.staticConfig,
-      dhcpPingTarget: autoSwitchConfig.dhcpPingTarget || 'baidu.com',
-      staticPingTarget: autoSwitchConfig.staticPingTarget || autoSwitchConfig.staticConfig?.gateway || '172.16.1.254',
+      currentActive: autoSwitchConfig.currentActive || 'network1',
+      network1Config,
+      network2Config
     });
     
     console.log('自动切换结果:', result);
+
+    const activeNetwork = result?.active_network === 'network2' ? 'network2' : 'network1';
+    // 持久化当前激活侧，避免依赖网卡状态推断
+    autoSwitchConfig = {
+      ...autoSwitchConfig,
+      network1: network1Config,
+      network2: network2Config,
+      currentActive: activeNetwork
+    };
+    localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
     
-    // 根据切换结果更新托盘颜色
-    if (result.includes('异常') || result.includes('都无法ping通')) {
-      // 双方都ping不通的异常情况，使用红色提示
-      const errorColor = '#FF0000';
+    let trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
+    if (result?.result === 'both_failed') {
+      trayColor = '#FF0000';
+      console.warn('网络异常：两侧都无法ping通，已回退到原侧');
+    }
+
+    if (trayColor) {
       try {
-        await invoke('update_tray_icon_color', { hexColor: errorColor });
-        state.setLastTrayColor(errorColor);
-        console.warn('网络异常：双方都无法ping通，保持当前模式');
-      } catch (error) {
-        console.warn('更新托盘图标颜色失败:', error);
-      }
-    } else if (result.includes('DHCP') || result.includes('保持DHCP')) {
-      // 切换到或保持DHCP模式（外网），使用外网托盘颜色
-      const dhcpColor = autoSwitchConfig.dhcpTrayColor || '#00FF00';
-      try {
-        await invoke('update_tray_icon_color', { hexColor: dhcpColor });
-        state.setLastTrayColor(dhcpColor);
-      } catch (error) {
-        console.warn('更新托盘图标颜色失败:', error);
-      }
-    } else if (result.includes('静态IP') || result.includes('切换到静态IP')) {
-      // 切换到静态IP模式（内网），使用内网托盘颜色
-      const staticColor = autoSwitchConfig.staticTrayColor || '#FFA500';
-      try {
-        await invoke('update_tray_icon_color', { hexColor: staticColor });
-        state.setLastTrayColor(staticColor);
+        await invoke('update_tray_icon_color', { hexColor: trayColor });
+        state.setLastTrayColor(trayColor);
       } catch (error) {
         console.warn('更新托盘图标颜色失败:', error);
       }
@@ -297,19 +348,21 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
   const currentConfig = autoSwitchConfig || {
     enabled: false,
     adapterName: mainAdapters[0]?.name || '',
-    dhcpConfig: {
-      dns: ['192.168.1.250', '114.114.114.114']
+    currentActive: 'network1',
+    network1: {
+      mode: 'dhcp',
+      dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+      staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+      pingTarget: 'baidu.com',
+      trayColor: '#00FF00'
     },
-    staticConfig: {
-      ip: '172.16.1.55',
-      subnet: '255.255.255.0',
-      gateway: '172.16.1.254',
-      dns: ['172.16.1.6']
-    },
-    dhcpPingTarget: 'baidu.com',
-    staticPingTarget: '172.16.1.254',
-    dhcpTrayColor: '#00FF00', // 外网托盘颜色（绿色）
-    staticTrayColor: '#FFA500' // 内网托盘颜色（橙色）
+    network2: {
+      mode: 'static',
+      dhcp: { dns: [] },
+      staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
+      pingTarget: '172.16.1.254',
+      trayColor: '#FFA500'
+    }
   };
   
   modal.innerHTML = `
@@ -334,75 +387,116 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
         </div>
         
         <div class="form-group">
-          <label>DHCP配置（外网）:</label>
+          <label>网络1配置:</label>
           <div class="form-group">
-            <label for="dhcp-dns">DNS服务器（逗号分隔）:</label>
-            <input type="text" id="dhcp-dns" class="form-input" 
-                   value="${currentConfig.dhcpConfig?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
+            <label for="network1-mode">模式:</label>
+            <select id="network1-mode" class="form-input">
+              <option value="dhcp" ${currentConfig.network1?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
+              <option value="static" ${currentConfig.network1?.mode === 'static' ? 'selected' : ''}>静态IP</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label for="dhcp-ping">Ping测试目标:</label>
-            <input type="text" id="dhcp-ping" class="form-input" 
-                   value="${currentConfig.dhcpPingTarget || 'baidu.com'}"
-                   placeholder="baidu.com">
-            <small class="form-hint">如果无法ping通此目标，将切换到静态IP</small>
+          <div class="form-group" id="network1-dhcp-fields" style="display: ${currentConfig.network1?.mode === 'dhcp' ? 'block' : 'none'};">
+            <label for="network1-dhcp-dns">DNS服务器（逗号分隔）:</label>
+            <input type="text" id="network1-dhcp-dns" class="form-input" 
+                   value="${currentConfig.network1?.dhcp?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
           </div>
-          <div class="form-group">
-            <label for="dhcp-tray-color">托盘图标颜色（外网）:</label>
-            <div class="color-picker-container">
-              <input type="color" id="dhcp-tray-color-picker" 
-                     value="${currentConfig.dhcpTrayColor || '#00FF00'}">
-              <input type="text" id="dhcp-tray-color" class="form-input" 
-                     placeholder="#00FF00" 
-                     value="${currentConfig.dhcpTrayColor || '#00FF00'}"
-                     pattern="^#[0-9A-Fa-f]{6}$"
-                     onchange="window.updateTrayColorPreview('dhcp')">
+          <div class="form-group" id="network1-static-fields" style="display: ${currentConfig.network1?.mode === 'static' ? 'block' : 'none'};">
+            <div class="form-group">
+              <label for="network1-static-ip">IP地址:</label>
+              <input type="text" id="network1-static-ip" class="form-input" 
+                     value="${currentConfig.network1?.staticConfig?.ip || ''}">
             </div>
-            <small class="form-hint">支持十六进制颜色格式，例如: #00FF00（绿色）</small>
+            <div class="form-group">
+              <label for="network1-static-subnet">子网掩码:</label>
+              <input type="text" id="network1-static-subnet" class="form-input" 
+                     value="${currentConfig.network1?.staticConfig?.subnet || ''}">
+            </div>
+            <div class="form-group">
+              <label for="network1-static-gateway">网关:</label>
+              <input type="text" id="network1-static-gateway" class="form-input" 
+                     value="${currentConfig.network1?.staticConfig?.gateway || ''}">
+            </div>
+            <div class="form-group">
+              <label for="network1-static-dns">DNS服务器（逗号分隔）:</label>
+              <input type="text" id="network1-static-dns" class="form-input" 
+                     value="${currentConfig.network1?.staticConfig?.dns?.join(', ') || ''}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="network1-ping">Ping测试目标:</label>
+            <input type="text" id="network1-ping" class="form-input" 
+                   value="${currentConfig.network1?.pingTarget || 'baidu.com'}"
+                   placeholder="例如: baidu.com 或 1.1.1.1">
+            <small class="form-hint">无法ping通时将尝试切换到网络2</small>
+          </div>
+          <div class="form-group">
+            <label for="network1-tray-color">托盘图标颜色（网络1）:</label>
+            <div class="color-picker-container">
+              <input type="color" id="network1-tray-color-picker" 
+                     value="${currentConfig.network1?.trayColor || '#00FF00'}">
+              <input type="text" id="network1-tray-color" class="form-input" 
+                     placeholder="#00FF00" 
+                     value="${currentConfig.network1?.trayColor || '#00FF00'}"
+                     pattern="^#[0-9A-Fa-f]{6}$"
+                     onchange="window.updateTrayColorPreview('network1')">
+            </div>
           </div>
         </div>
-        
+
         <div class="form-group">
-          <label>静态IP配置（内网）:</label>
+          <label>网络2配置:</label>
           <div class="form-group">
-            <label for="static-ip">IP地址:</label>
-            <input type="text" id="static-ip" class="form-input" 
-                   value="${currentConfig.staticConfig?.ip || '172.16.1.55'}">
+            <label for="network2-mode">模式:</label>
+            <select id="network2-mode" class="form-input">
+              <option value="dhcp" ${currentConfig.network2?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
+              <option value="static" ${currentConfig.network2?.mode === 'static' ? 'selected' : ''}>静态IP</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label for="static-subnet">子网掩码:</label>
-            <input type="text" id="static-subnet" class="form-input" 
-                   value="${currentConfig.staticConfig?.subnet || '255.255.255.0'}">
+          <div class="form-group" id="network2-dhcp-fields" style="display: ${currentConfig.network2?.mode === 'dhcp' ? 'block' : 'none'};">
+            <label for="network2-dhcp-dns">DNS服务器（逗号分隔）:</label>
+            <input type="text" id="network2-dhcp-dns" class="form-input" 
+                   value="${currentConfig.network2?.dhcp?.dns?.join(', ') || ''}">
           </div>
-          <div class="form-group">
-            <label for="static-gateway">网关:</label>
-            <input type="text" id="static-gateway" class="form-input" 
-                   value="${currentConfig.staticConfig?.gateway || '172.16.1.254'}">
-          </div>
-          <div class="form-group">
-            <label for="static-dns">DNS服务器（逗号分隔）:</label>
-            <input type="text" id="static-dns" class="form-input" 
-                   value="${currentConfig.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
-          </div>
-          <div class="form-group">
-            <label for="static-ping">Ping测试目标:</label>
-            <input type="text" id="static-ping" class="form-input" 
-                   value="${currentConfig.staticPingTarget || '172.16.1.254'}"
-                   placeholder="172.16.1.254">
-            <small class="form-hint">如果无法ping通此目标，将切换到DHCP</small>
-          </div>
-          <div class="form-group">
-            <label for="static-tray-color">托盘图标颜色（内网）:</label>
-            <div class="color-picker-container">
-              <input type="color" id="static-tray-color-picker" 
-                     value="${currentConfig.staticTrayColor || '#FFA500'}">
-              <input type="text" id="static-tray-color" class="form-input" 
-                     placeholder="#FFA500" 
-                     value="${currentConfig.staticTrayColor || '#FFA500'}"
-                     pattern="^#[0-9A-Fa-f]{6}$"
-                     onchange="window.updateTrayColorPreview('static')">
+          <div class="form-group" id="network2-static-fields" style="display: ${currentConfig.network2?.mode === 'static' ? 'block' : 'none'};">
+            <div class="form-group">
+              <label for="network2-static-ip">IP地址:</label>
+              <input type="text" id="network2-static-ip" class="form-input" 
+                     value="${currentConfig.network2?.staticConfig?.ip || '172.16.1.55'}">
             </div>
-            <small class="form-hint">支持十六进制颜色格式，例如: #FFA500（橙色）</small>
+            <div class="form-group">
+              <label for="network2-static-subnet">子网掩码:</label>
+              <input type="text" id="network2-static-subnet" class="form-input" 
+                     value="${currentConfig.network2?.staticConfig?.subnet || '255.255.255.0'}">
+            </div>
+            <div class="form-group">
+              <label for="network2-static-gateway">网关:</label>
+              <input type="text" id="network2-static-gateway" class="form-input" 
+                     value="${currentConfig.network2?.staticConfig?.gateway || '172.16.1.254'}">
+            </div>
+            <div class="form-group">
+              <label for="network2-static-dns">DNS服务器（逗号分隔）:</label>
+              <input type="text" id="network2-static-dns" class="form-input" 
+                     value="${currentConfig.network2?.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="network2-ping">Ping测试目标:</label>
+            <input type="text" id="network2-ping" class="form-input" 
+                   value="${currentConfig.network2?.pingTarget || '172.16.1.254'}"
+                   placeholder="例如: 172.16.1.254">
+            <small class="form-hint">无法ping通时将尝试切换到网络1</small>
+          </div>
+          <div class="form-group">
+            <label for="network2-tray-color">托盘图标颜色（网络2）:</label>
+            <div class="color-picker-container">
+              <input type="color" id="network2-tray-color-picker" 
+                     value="${currentConfig.network2?.trayColor || '#FFA500'}">
+              <input type="text" id="network2-tray-color" class="form-input" 
+                     placeholder="#FFA500" 
+                     value="${currentConfig.network2?.trayColor || '#FFA500'}"
+                     pattern="^#[0-9A-Fa-f]{6}$"
+                     onchange="window.updateTrayColorPreview('network2')">
+            </div>
           </div>
         </div>
       </div>
@@ -445,6 +539,24 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
   if (currentConfig.adapterName) {
     document.getElementById('auto-switch-adapter').value = currentConfig.adapterName;
   }
+
+  // 绑定模式切换显示
+  const bindModeToggle = (modeId, staticId, dhcpId) => {
+    const modeSelect = document.getElementById(modeId);
+    const staticFields = document.getElementById(staticId);
+    const dhcpFields = document.getElementById(dhcpId);
+    if (!modeSelect) return;
+    const toggle = () => {
+      const isStatic = modeSelect.value === 'static';
+      if (staticFields) staticFields.style.display = isStatic ? 'block' : 'none';
+      if (dhcpFields) dhcpFields.style.display = isStatic ? 'none' : 'block';
+    };
+    modeSelect.addEventListener('change', toggle);
+    toggle();
+  };
+
+  bindModeToggle('network1-mode', 'network1-static-fields', 'network1-dhcp-fields');
+  bindModeToggle('network2-mode', 'network2-static-fields', 'network2-dhcp-fields');
 }
 
 // 取消自动切换配置
@@ -478,48 +590,84 @@ window.updateTrayColorPreview = function(type) {
 window.saveAutoSwitchConfig = function() {
   const enabled = document.getElementById('auto-switch-enabled').checked;
   const adapterName = document.getElementById('auto-switch-adapter').value;
-  const dhcpDns = document.getElementById('dhcp-dns').value.trim();
-  const dhcpPing = document.getElementById('dhcp-ping').value.trim();
-  const staticIp = document.getElementById('static-ip').value.trim();
-  const staticSubnet = document.getElementById('static-subnet').value.trim();
-  const staticGateway = document.getElementById('static-gateway').value.trim();
-  const staticDns = document.getElementById('static-dns').value.trim();
-  const staticPing = document.getElementById('static-ping').value.trim();
   
-  // 获取托盘颜色
-  const dhcpTrayColorInput = document.getElementById('dhcp-tray-color');
-  const staticTrayColorInput = document.getElementById('static-tray-color');
-  const dhcpTrayColor = dhcpTrayColorInput ? dhcpTrayColorInput.value.trim() : '';
-  const staticTrayColor = staticTrayColorInput ? staticTrayColorInput.value.trim() : '';
-  const validDhcpTrayColor = dhcpTrayColor && /^#[0-9A-Fa-f]{6}$/.test(dhcpTrayColor) ? dhcpTrayColor : '#00FF00';
-  const validStaticTrayColor = staticTrayColor && /^#[0-9A-Fa-f]{6}$/.test(staticTrayColor) ? staticTrayColor : '#FFA500';
+  const network1Mode = document.getElementById('network1-mode').value;
+  const network1DhcpDns = document.getElementById('network1-dhcp-dns').value.trim();
+  const network1StaticIp = document.getElementById('network1-static-ip').value.trim();
+  const network1StaticSubnet = document.getElementById('network1-static-subnet').value.trim();
+  const network1StaticGateway = document.getElementById('network1-static-gateway').value.trim();
+  const network1StaticDns = document.getElementById('network1-static-dns').value.trim();
+  const network1Ping = document.getElementById('network1-ping').value.trim();
+  const network1TrayColorInput = document.getElementById('network1-tray-color');
+  const network1TrayColor = network1TrayColorInput ? network1TrayColorInput.value.trim() : '';
+  const validNetwork1TrayColor = network1TrayColor && /^#[0-9A-Fa-f]{6}$/.test(network1TrayColor) ? network1TrayColor : '#00FF00';
+
+  const network2Mode = document.getElementById('network2-mode').value;
+  const network2DhcpDns = document.getElementById('network2-dhcp-dns').value.trim();
+  const network2StaticIp = document.getElementById('network2-static-ip').value.trim();
+  const network2StaticSubnet = document.getElementById('network2-static-subnet').value.trim();
+  const network2StaticGateway = document.getElementById('network2-static-gateway').value.trim();
+  const network2StaticDns = document.getElementById('network2-static-dns').value.trim();
+  const network2Ping = document.getElementById('network2-ping').value.trim();
+  const network2TrayColorInput = document.getElementById('network2-tray-color');
+  const network2TrayColor = network2TrayColorInput ? network2TrayColorInput.value.trim() : '';
+  const validNetwork2TrayColor = network2TrayColor && /^#[0-9A-Fa-f]{6}$/.test(network2TrayColor) ? network2TrayColor : '#FFA500';
   
   if (!adapterName) {
     alert('请选择网络适配器');
     return;
   }
   
-  if (!dhcpPing || !staticPing) {
-    alert('请填写ping测试目标');
+  if (!network1Ping || !network2Ping) {
+    alert('请填写两个网络的ping测试目标');
     return;
+  }
+
+  if (network1Mode === 'static') {
+    if (!network1StaticIp || !network1StaticSubnet || !network1StaticGateway) {
+      alert('网络1静态配置请填写IP/子网/网关');
+      return;
+    }
+  }
+  if (network2Mode === 'static') {
+    if (!network2StaticIp || !network2StaticSubnet || !network2StaticGateway) {
+      alert('网络2静态配置请填写IP/子网/网关');
+      return;
+    }
   }
   
   const config = {
     enabled,
     adapterName,
-    dhcpConfig: {
-      dns: dhcpDns ? dhcpDns.split(',').map(s => s.trim()).filter(s => s) : []
+    currentActive: autoSwitchConfig?.currentActive || 'network1',
+    network1: {
+      mode: network1Mode,
+      dhcp: {
+        dns: network1DhcpDns ? network1DhcpDns.split(',').map(s => s.trim()).filter(s => s) : []
+      },
+      staticConfig: {
+        ip: network1StaticIp,
+        subnet: network1StaticSubnet,
+        gateway: network1StaticGateway,
+        dns: network1StaticDns ? network1StaticDns.split(',').map(s => s.trim()).filter(s => s) : []
+      },
+      pingTarget: network1Ping,
+      trayColor: validNetwork1TrayColor
     },
-    staticConfig: {
-      ip: staticIp,
-      subnet: staticSubnet,
-      gateway: staticGateway,
-      dns: staticDns ? staticDns.split(',').map(s => s.trim()).filter(s => s) : []
-    },
-    dhcpPingTarget: dhcpPing,
-    staticPingTarget: staticPing,
-    dhcpTrayColor: validDhcpTrayColor,
-    staticTrayColor: validStaticTrayColor
+    network2: {
+      mode: network2Mode,
+      dhcp: {
+        dns: network2DhcpDns ? network2DhcpDns.split(',').map(s => s.trim()).filter(s => s) : []
+      },
+      staticConfig: {
+        ip: network2StaticIp,
+        subnet: network2StaticSubnet,
+        gateway: network2StaticGateway,
+        dns: network2StaticDns ? network2StaticDns.split(',').map(s => s.trim()).filter(s => s) : []
+      },
+      pingTarget: network2Ping,
+      trayColor: validNetwork2TrayColor
+    }
   };
   
   setAutoSwitchConfig(config);
