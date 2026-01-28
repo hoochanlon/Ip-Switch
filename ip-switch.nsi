@@ -53,9 +53,46 @@ RequestExecutionLevel admin
 ; !insertmacro MUI_LANGUAGE "English"
 
 ;--------------------------------
+; Function to close running application
+; This function will be called before installation/uninstallation
+
+Function CloseApp
+  ; Force kill the process and all child processes
+  ; /F = force, /IM = image name, /T = kill child processes
+  nsExec::ExecToStack 'taskkill /F /IM "${APP_EXE}" /T'
+  Pop $0
+  Pop $1
+  
+  ; Wait for process to fully terminate and verify (retry up to 5 times)
+  StrCpy $2 0
+  retry_loop:
+    Sleep 500
+    IntOp $2 $2 + 1
+    
+    ; Check if process still exists
+    ; find returns 0 if found, non-zero if not found
+    nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq ${APP_EXE}" 2^>NUL | find /I "${APP_EXE}" >NUL'
+    Pop $0
+    
+    ; If process not found (exit code != 0), we're done
+    IntCmp $0 0 still_running
+    Goto done
+    
+    still_running:
+      ; If we've tried 5 times, give up and continue anyway
+      IntCmp $2 5 done
+      Goto retry_loop
+  
+  done:
+FunctionEnd
+
+;--------------------------------
 ; Install section
 
 Section "MainSection" SEC_Main
+  ; Close any running instance before installation
+  Call CloseApp
+  
   SetOutPath "$INSTDIR"
 
   ; Save install dir to registry
@@ -98,9 +135,11 @@ SectionEnd
 ; Uninstall section
 
 Section "Uninstall"
-  ; Try to kill running process (optional)
-  nsExec::ExecToStack 'taskkill /F /IM "${APP_EXE}"'
-  Pop $0  ; Exit code (ignored)
+  ; Close running application before uninstallation
+  Call un.CloseApp
+  
+  ; Wait a bit more to ensure files are released
+  Sleep 1000
 
   ; Remove files and dir
   Delete "$INSTDIR\Uninstall.exe"
@@ -119,3 +158,36 @@ Section "Uninstall"
   DeleteRegKey HKLM "Software\Ip-Switch"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch"
 SectionEnd
+
+;--------------------------------
+; Uninstaller function to close running application
+
+Function un.CloseApp
+  ; Force kill the process and all child processes
+  ; /F = force, /IM = image name, /T = kill child processes
+  nsExec::ExecToStack 'taskkill /F /IM "${APP_EXE}" /T'
+  Pop $0
+  Pop $1
+  
+  ; Wait for process to fully terminate and verify (retry up to 5 times)
+  StrCpy $2 0
+  retry_loop:
+    Sleep 500
+    IntOp $2 $2 + 1
+    
+    ; Check if process still exists
+    ; find returns 0 if found, non-zero if not found
+    nsExec::ExecToStack 'tasklist /FI "IMAGENAME eq ${APP_EXE}" 2^>NUL | find /I "${APP_EXE}" >NUL'
+    Pop $0
+    
+    ; If process not found (exit code != 0), we're done
+    IntCmp $0 0 still_running
+    Goto done
+    
+    still_running:
+      ; If we've tried 5 times, give up and continue anyway
+      IntCmp $2 5 done
+      Goto retry_loop
+  
+  done:
+FunctionEnd

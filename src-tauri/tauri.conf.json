@@ -6,6 +6,9 @@
     "resources": [
       "../fonts/OPPOSans4.0.ttf",
       "../imgs"
+    ],
+    "icon": [
+      "../imgs/ico/logo.ico"
     ]
   },
   "build": {
