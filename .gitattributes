@@ -16,9 +16,10 @@ src/** linguist-vendored=true
 index.html linguist-vendored=true
 vite.config.js linguist-vendored=true
 
-# --- JSON (exclude from language stats) ---
-*.json linguist-vendored=true
-*.lock linguist-vendored=true
+# --- JSON / lockfiles (exclude from language stats) ---
+# 使用 linguist-detectable=false 更直接地让 GitHub 不统计这些文件
+*.json linguist-detectable=false
+*.lock linguist-detectable=false
 
 # --- Rust (ensure detectable) ---
 src-tauri/** linguist-detectable=true
