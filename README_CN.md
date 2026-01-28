@@ -1,6 +1,6 @@
 # IP Switch
 
-[English](./README_EN.md)
+[English](./README.md)
 
 <p align="center">
   <img src="./imgs/tarui/logo.png" alt="软件图标" width="100"><br/>
@@ -22,6 +22,7 @@
 - ✅ Hosts 文件编辑，支持远程更新
 - ✅ 代理配置管理，支持远程PAC更新
 - ✅ 托盘颜色可自定义，以及能够根据不同的网络状态显示不同的颜色
+- ✅ 窗口体验优化：最大化/还原状态同步、双击标题栏空白处切换、最大化时“网卡场景管理”区域自动变宽
 
 
 下载：https://github.com/hoochanlon/Ip-Switch/releases
@@ -33,8 +34,6 @@
 <!-- ![](./screenshots/demo.png) -->
 
 ![](./screenshots/proxy-config.png)
-
-![]()
 
 配置效果
 
@@ -68,14 +67,12 @@ npm run dev:admin
 npm run tauri build
 ```
 
-NSIS 封装打包
-
-nullsoft scriptable install system
-
-软件下载：
+NSIS(nullsoft scriptable install system)封装打包，软件下载：
 
 * https://www.mefcl.com/nsis-3-0-5.html
 * https://www.cnblogs.com/NSIS/p/16581122.html
+
+以及图标缓存清除工具：https://www.sordum.org/9194/rebuild-shell-icon-cache-v1-3/
 
 操作过程：
 

@@ -21,6 +21,7 @@
 - ✅ Hosts file editor, supports remote updates
 - ✅ Proxy configuration management, supports remote PAC updates
 - ✅ Tray color customization + dynamic colors for different network states
+- ✅ Window UX: maximize/restore sync, double‑click titlebar to toggle, maximized layout widens the Scene Manager panel
 
 Download: https://github.com/hoochanlon/Ip-Switch/releases
 
@@ -31,8 +32,6 @@ Configuration
 <!-- ![](./screenshots/demo.png) -->
 
 ![](./screenshots/proxy-config.png)
-
-![]()
 
 Result
 
