@@ -194,6 +194,7 @@ fn main() {
             network::auto_switch_network,
             open_devtools,
             set_tray_tooltip,
+            open_network_connections,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -231,6 +232,26 @@ async fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), 
         }
     }
     Err("无法获取托盘图标句柄".to_string())
+}
+
+/// 打开 Windows“网络连接”控制面板（control.exe ncpa.cpl）
+#[tauri::command]
+#[cfg(target_os = "windows")]
+async fn open_network_connections() -> Result<(), String> {
+    use std::process::Command;
+    // 使用 control.exe 直接打开“网络连接”窗口
+    Command::new("control")
+        .arg("ncpa.cpl")
+        .spawn()
+        .map_err(|e| format!("无法打开网络连接面板: {}", e))?;
+    Ok(())
+}
+
+/// 非 Windows 平台：直接返回错误（理论上不会用到）
+#[tauri::command]
+#[cfg(not(target_os = "windows"))]
+async fn open_network_connections() -> Result<(), String> {
+    Err("仅在 Windows 上支持打开网络连接控制面板".to_string())
 }
 
 // 加载托盘图标（优先使用 SVG，失败则使用默认图标）

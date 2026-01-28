@@ -17,6 +17,11 @@ body {
   background: var(--bg-primary);
   min-height: 100vh;
   color: var(--text-primary);
+  /* 默认禁止文字被选中，提升“工具面板”质感 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .container {
@@ -24,3 +29,13 @@ body {
   margin: 0 auto;
 }
 
+/* 表单输入、文本区域等仍然允许选中文本，方便复制/编辑 */
+input,
+textarea,
+button,
+select {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}

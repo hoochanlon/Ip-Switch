@@ -198,7 +198,7 @@ export function initNetworkFilter() {
       const typeInfo = getNetworkTypeInfo(adapter?.network_type || (adapter?.is_wireless ? 'wifi' : 'ethernet'));
       const checked = state.isAdapterSelected(name);
       return `
-        <label class="network-filter-item" title="${escapeHtml(name)}">
+        <label class="network-filter-item">
           <input type="checkbox" class="network-filter-checkbox" data-adapter-name="${escapeHtml(name)}" ${checked ? 'checked' : ''} />
           <span class="network-filter-item-main">
             <span class="network-filter-item-name">${escapeHtml(name)}</span>
@@ -374,7 +374,7 @@ function renderFullMode(container) {
         </div>
         <div class="detail-row dns-row">
           <span class="label">${t('dnsServers')}</span>
-          <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
+          <span class="value">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('mediaStateLabel')}:</span>

@@ -236,6 +236,19 @@ function setupEventListeners() {
   document.getElementById('refresh-btn').addEventListener('click', () => {
     refreshNetworkInfo(true); // 手动刷新时显示加载提示
   });
+
+  // 打开 Windows “网络连接”控制面板
+  const openNetConnBtn = document.getElementById('open-network-connections-btn');
+  if (openNetConnBtn) {
+    openNetConnBtn.addEventListener('click', async () => {
+      try {
+        await invoke('open_network_connections');
+      } catch (error) {
+        console.error('打开网络连接控制面板失败:', error);
+        alert(`无法打开“网络连接”控制面板：${String(error || '').split('\n')[0] || error}`);
+      }
+    });
+  }
   document.getElementById('about-btn').addEventListener('click', showAboutModal);
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', editHosts);
