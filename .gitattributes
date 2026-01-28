@@ -16,6 +16,10 @@ src/** linguist-vendored=true
 index.html linguist-vendored=true
 vite.config.js linguist-vendored=true
 
+# --- JSON (exclude from language stats) ---
+*.json linguist-vendored=true
+*.lock linguist-vendored=true
+
 # --- Rust (ensure detectable) ---
 src-tauri/** linguist-detectable=true
 
