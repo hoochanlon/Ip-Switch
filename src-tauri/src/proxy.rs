@@ -7,6 +7,8 @@ pub struct ProxyConfig {
     pub enabled: bool,
     pub server: String,
     pub bypass: Vec<String>,
+    pub auto_detect: bool,
+    pub auto_config_url: String,
 }
 
 #[tauri::command]
@@ -28,6 +30,16 @@ pub async fn get_proxy() -> Result<ProxyConfig, String> {
         .get_value("ProxyOverride")
         .unwrap_or_else(|_| "".to_string());
 
+    // 自动检测设置
+    let auto_detect: u32 = internet_settings
+        .get_value("AutoDetect")
+        .unwrap_or(0);
+
+    // 自动配置脚本地址（PAC）
+    let auto_config_url: String = internet_settings
+        .get_value("AutoConfigURL")
+        .unwrap_or_else(|_| "".to_string());
+
     let bypass = if proxy_override.is_empty() {
         Vec::new()
     } else {
@@ -38,6 +50,8 @@ pub async fn get_proxy() -> Result<ProxyConfig, String> {
         enabled: proxy_enable != 0,
         server: proxy_server,
         bypass,
+        auto_detect: auto_detect != 0,
+        auto_config_url,
     })
 }
 
@@ -46,6 +60,8 @@ pub async fn set_proxy(
     enabled: bool,
     server: String,
     bypass: Vec<String>,
+    auto_detect: bool,
+    auto_config_url: String,
 ) -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (internet_settings, _) = hkcu
@@ -70,6 +86,21 @@ pub async fn set_proxy(
         internet_settings
             .set_value("ProxyOverride", &bypass_str)
             .map_err(|e| format!("设置代理绕过列表失败: {}", e))?;
+    }
+
+    // 自动检测开关
+    internet_settings
+        .set_value("AutoDetect", &(if auto_detect { 1u32 } else { 0u32 }))
+        .map_err(|e| format!("设置自动检测失败: {}", e))?;
+
+    // 自动配置脚本地址（PAC）
+    if auto_config_url.trim().is_empty() {
+        // 清空时删除键值，避免残留
+        let _ = internet_settings.delete_value("AutoConfigURL");
+    } else {
+        internet_settings
+            .set_value("AutoConfigURL", &auto_config_url)
+            .map_err(|e| format!("设置自动配置脚本地址失败: {}", e))?;
     }
 
     // 通知系统代理设置已更改

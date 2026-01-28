@@ -31,6 +31,24 @@ function showProxyEditor(proxy) {
           </label>
         </div>
         <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="proxy-auto-detect" ${proxy.auto_detect ? 'checked' : ''}>
+            <span>${t('proxyAutoDetect')}</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="proxy-use-script" ${proxy.auto_config_url ? 'checked' : ''}>
+            <span>${t('proxyUseScript')}</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="proxy-script-url">${t('proxyScriptAddress')}</label>
+          <input type="text" id="proxy-script-url" class="form-input"
+                 placeholder="http://127.0.0.1:8080/proxy.pac"
+                 value="${proxy.auto_config_url || ''}">
+        </div>
+        <div class="form-group">
           <label for="proxy-server">${t('proxyServer')}</label>
           <input type="text" id="proxy-server" class="form-input" 
                  placeholder="127.0.0.1:8080" 
@@ -58,6 +76,9 @@ window.saveProxy = async function() {
   const enabled = document.getElementById('proxy-enabled').checked;
   const server = document.getElementById('proxy-server').value.trim();
   const bypassText = document.getElementById('proxy-bypass').value.trim();
+  const autoDetect = document.getElementById('proxy-auto-detect').checked;
+  const useScript = document.getElementById('proxy-use-script').checked;
+  const scriptUrl = document.getElementById('proxy-script-url').value.trim();
   
   if (enabled && !server) {
     alert(t('proxyServerRequired'));
@@ -70,7 +91,9 @@ window.saveProxy = async function() {
     await invoke('set_proxy', {
       enabled,
       server: enabled ? server : '',
-      bypass
+      bypass,
+      auto_detect: autoDetect,
+      auto_config_url: useScript ? scriptUrl : ''
     });
     alert(t('proxyUpdated'));
     document.querySelector('.modal-overlay')?.remove();
