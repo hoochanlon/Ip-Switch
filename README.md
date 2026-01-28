@@ -58,20 +58,72 @@ nullsoft scriptable install system
 操作过程：编译 NSI 脚本 > 文件 > 加载脚本 > ip-switch.nsi
 
 
-## hosts ＆ DNS
+## Proxy
+
+镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)。
+
+> [!NOTE]
+> 广告屏蔽规则 ≠ Clash 订阅代理规则，前者是“精细杀广告”，后者是“全局流量分流 + 顺带杀广告域名”。但 Clash 可以导入“广告专用规则集”来增强去广告效果。
+
+
+* [gfwlist/gfwlist](https://github.com/gfwlist/gfwlist)
+* [PaPerseller/chn-iplist](https://github.com/PaPerseller/chn-iplist)
+* [TG-Twilight/AWAvenue-Ads-Rule](https://github.com/TG-Twilight/AWAvenue-Ads-Rule)
+
+
+**PAC(Proxy auto-config) 主要符号含义**
+
+无 `@@` 的规则 → **走代理**（翻墙）或 **REJECT**（广告/屏蔽）。
+
+有 `@@` 的规则 → **强制直连**（DIRECT，国内服务加速用）。
+
+示例：
+```text
+! 这是一行注释，可做标题
+
+||google.com          # 走代理（翻墙）
+.duckduckgo.com       # 同上，后缀匹配
+@@||baidu.com         # 强制直连（国内服务）
+```
+
+
+**广告屏蔽规则主要符号含义（uBlock Origin / AdBlock Plus 风格）**
+
+无 `@@` 的规则 → **阻断 / 屏蔽**（挡掉广告、追踪器、弹窗等）。
+
+有 `@@` 的规则 → **例外 / 白名单**（放过不挡，通常用于避免误伤正常内容）。
+
+示例：
+```text
+! 这是一行注释，可做标题或说明
+
+||ads.google.com       # 阻断（挡掉这个广告域名及其子域的所有请求）
+.doubleclick.net      # 同上，后缀匹配（挡以 .doubleclick.net 结尾的域名）
+@@||baidu.com         # 例外（即使前面有匹配，也放过百度，不挡）
+@@||*.aliyun.com^     # 例外（阿里云相关域名全部放过）
+
+example.com##.ad-banner       # 隐藏页面上 class="ad-banner" 的广告块
+example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的元素
+```
+
+
+## Hosts ＆ DNS 推荐列表
 
 **hosts**
 
+[jplopsoft - HOSTS Blocker常用列表說明](https://jplop.neocities.org/teac_hosts_block)
+
 * [ineo6/hosts](https://github.com/ineo6/hosts)
-* [国立台湾大学DNS](https://isms.ntu.edu.tw/DNSlist.html)
-* [HOSTS Blocker常用列表](https://jplop.neocities.org/teac_hosts_block)
 * [StevenBlack/hosts](https://github.com/StevenBlack/hosts)
 * [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
 
 **DNS**
 
-https://www.dolingou.com/article/dns-servers-guide
+[國立臺灣大學計算機及資訊網路中心 - DNS伺服器清單](https://isms.ntu.edu.tw/DNSlist.html)
 
 * [DNS SB](https://dns.sb)
 * [Next DNS](https://my.nextdns.io/a9bdef/setup)
 * [Quad9](https://quad9.net/)
+* [dolingou - Dns Servers Guide](https://www.dolingou.com/article/dns-servers-guide)
+
+推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4) 
