@@ -29,14 +29,10 @@ function showProxyEditor(proxy) {
             <input type="checkbox" id="proxy-enabled" ${proxy.enabled ? 'checked' : ''}>
             <span>${t('proxyEnabled')}</span>
           </label>
-        </div>
-        <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="proxy-auto-detect" ${proxy.auto_detect ? 'checked' : ''}>
             <span>${t('proxyAutoDetect')}</span>
           </label>
-        </div>
-        <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="proxy-use-script" ${proxy.auto_config_url ? 'checked' : ''}>
             <span>${t('proxyUseScript')}</span>

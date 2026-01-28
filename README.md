@@ -54,6 +54,14 @@
 npm install
 npm run tauri dev
 ```
+
+或以管理员权限运行
+
+```
+npm run dev:admin
+```
+
+
 构建
 
 ```bash
@@ -69,7 +77,32 @@ nullsoft scriptable install system
 * https://www.mefcl.com/nsis-3-0-5.html
 * https://www.cnblogs.com/NSIS/p/16581122.html
 
-操作过程：编译 NSI 脚本 > 文件 > 加载脚本 > ip-switch.nsi
+操作过程：
+
+编译 NSI 脚本 > 文件 > 加载脚本 > ip-switch.nsi
+
+或使用一次性命令
+
+```
+"C:\Program Files (x86)\NSIS\makensis.exe" ip-switch.nsi
+```
+
+以及加入环境变量方式（以下二选一），配合使用
+
+```powershell
+[Environment]::SetEnvironmentVariable('Path',$env:Path + ';C:\Program Files (x86)\NSIS','User')
+```
+
+```cmd
+setx PATH "%PATH%;C:\Program Files (x86)\NSIS"
+```
+
+关闭所有窗口，到项目路径执行
+
+```
+makensis ip-switch.nsi
+```
+
 
 
 ## Proxy
