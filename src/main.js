@@ -288,6 +288,26 @@ function setupEventListeners() {
     } catch {
       // ignore
     }
+
+    // 语言切换后：立即刷新 UI 文案（无需用户手动点刷新）
+    // - 网络状态标签（在线/离线、场景状态等）
+    // - 网络信息卡片/空态文案
+    // - 筛选下拉（创建时写死了文案，直接移除让下次打开时按新语言重建）
+    try {
+      await updateStatusIndicator();
+    } catch {
+      // ignore
+    }
+    try {
+      renderNetworkInfo();
+    } catch {
+      // ignore
+    }
+    try {
+      document.getElementById('network-filter-dropdown')?.remove();
+    } catch {
+      // ignore
+    }
   });
   
   // 主题切换按钮
