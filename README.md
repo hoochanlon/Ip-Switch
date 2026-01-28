@@ -2,6 +2,9 @@
 
 <p align="center">
   <img src="./imgs/tarui/logo.png" alt="软件图标" width="100"><br/>
+    <img src="./imgs/tarui/red-heart.png" width="50">
+  <img src="./imgs/tarui/add.png" height="50"> 
+   <img src="./imgs/tarui/tarui.png" height="50"> <br/> <br/>
   随心切换场景，Hosts 与代理智能协同，实时流量监控 + 网络状态提醒，让每一次上网都自由而从容。
 </p>
 
@@ -136,8 +139,4 @@ example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的�
 
 推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4) 
 
-<p align="center">
-  <img src="./imgs/tarui/red-heart.png" width="100">
-  <img src="./imgs/tarui/add.png" height="100"> 
-   <img src="./imgs/tarui/tarui.png" height="100"> 
-</p>
+
