@@ -2,6 +2,12 @@
   "productName": "ip-switch",
   "version": "1.0.0",
   "identifier": "com.ipswitch.app",
+  "bundle": {
+    "resources": [
+      "../fonts/OPPOSans4.0.ttf",
+      "../imgs"
+    ]
+  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

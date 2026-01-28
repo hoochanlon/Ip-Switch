@@ -251,6 +251,13 @@ impl TrayIconGenerator {
         use std::fs;
         use std::path::PathBuf;
 
+        // 优先使用编译期内嵌字体，避免 release 运行时找不到资源文件
+        //（例如直接运行 target\release\ip-switch.exe 时并不存在 resources/fonts 目录）。
+        const EMBEDDED_OPPO: &[u8] = include_bytes!("../../fonts/OPPOSans4.0.ttf");
+        if !EMBEDDED_OPPO.is_empty() {
+            return Some(EMBEDDED_OPPO.to_vec());
+        }
+
         let mut font_paths = Vec::new();
 
         // 生产环境常见位置：exe 同级或 resources/fonts 下
