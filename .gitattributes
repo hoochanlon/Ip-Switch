@@ -21,6 +21,7 @@ vite.config.js linguist-vendored=true
 *.json linguist-detectable=false
 *.lock linguist-detectable=false
 
-# --- Rust (ensure detectable) ---
+# --- Rust (force recognize as Rust) ---
+src-tauri/** linguist-language=Rust
 src-tauri/** linguist-detectable=true
 
