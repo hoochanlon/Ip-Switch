@@ -208,13 +208,13 @@ async fn set_dns_servers(adapter_name: String, dns: Vec<String>) -> Result<(), S
     network::set_dns_servers_internal(adapter_name, dns).await
 }
 
-/// 打开当前窗口的开发者工具（仅在调试/开发模式下有效）
+/// 打开当前窗口的开发者工具
+///
+/// 需要在 `Cargo.toml` 为 tauri 开启 `devtools` feature，才能在 release 中使用。
 #[tauri::command]
-async fn open_devtools(_window: tauri::WebviewWindow) {
-    #[cfg(debug_assertions)]
-    {
-        _window.open_devtools();
-    }
+async fn open_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.open_devtools();
+    Ok(())
 }
 
 // 加载托盘图标（优先使用 SVG，失败则使用默认图标）

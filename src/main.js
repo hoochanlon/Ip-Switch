@@ -1,5 +1,6 @@
 import './style.css';
 import { invoke } from '@tauri-apps/api/core';
+// NOTE: DevTools 打开通过后端命令实现（需要 tauri `devtools` feature）
 import NetworkStatus from './network-status.js';
 import { initTheme, toggleTheme } from './theme.js';
 import * as state from './state.js';
@@ -218,6 +219,8 @@ window.openDevtools = async () => {
     await invoke('open_devtools');
   } catch (error) {
     console.error('打开开发者工具失败:', error);
+    // 给用户一个可见反馈，避免“点了没反应”
+    alert(`打开开发者工具失败：${String(error || '').split('\n')[0] || error}`);
   }
 };
 

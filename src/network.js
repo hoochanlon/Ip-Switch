@@ -264,11 +264,12 @@ export function initNetworkFilter() {
 // 获取网络类型图标和标签
 export function getNetworkTypeInfo(networkType) {
   const types = {
-    'wifi': { icon: 'imgs/svg/status/wifi.svg', label: 'WiFi', class: 'wifi' },
-    'ethernet': { icon: 'imgs/svg/status/ethernet.svg', label: t('ethernet'), class: 'ethernet' },
-    'bluetooth': { icon: 'imgs/svg/status/bluetooth.svg', label: t('bluetooth'), class: 'bluetooth' },
-    'vpn': { icon: 'imgs/svg/status/vpn.svg', label: 'VPN', class: 'vpn' },
-    'other': { icon: 'imgs/svg/status/connect.svg', label: t('other'), class: 'other' }
+    // 统一使用绝对路径，避免在 Tauri/Vite 下相对路径解析导致“部分 svg 不显示”
+    'wifi': { icon: '/imgs/svg/status/wifi.svg', label: 'WiFi', class: 'wifi' },
+    'ethernet': { icon: '/imgs/svg/status/ethernet.svg', label: t('ethernet'), class: 'ethernet' },
+    'bluetooth': { icon: '/imgs/svg/status/bluetooth.svg', label: t('bluetooth'), class: 'bluetooth' },
+    'vpn': { icon: '/imgs/svg/status/vpn.svg', label: 'VPN', class: 'vpn' },
+    'other': { icon: '/imgs/svg/status/connect.svg', label: t('other'), class: 'other' }
   };
   return types[networkType] || types['other'];
 }

@@ -58,8 +58,10 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 ; 依赖 DLL 文件
 Source: "{#SourceDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
-; 资源文件（如果有）
-Source: "{#SourceDir}\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 前端静态资源（由 Vite 构建到 dist 目录）
+Source: "dist\*"; DestDir: "{app}\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 字体文件（用于托盘图标等）
+Source: "fonts\OPPOSans4.0.ttf"; DestDir: "{app}\fonts"; Flags: ignoreversion
 ; WebView2 运行时（如果需要）
 ; Source: "redist\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
