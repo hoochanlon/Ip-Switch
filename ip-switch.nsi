@@ -8,6 +8,14 @@
 Name "IP Switch"
 OutFile "Ip-Switch-Setup.exe"
 
+;--------------------------------
+; Installer / Uninstaller icons (must be defined BEFORE MUI pages are inserted)
+;
+; Note: This controls the icon of the *installer/uninstaller EXE* (Ip-Switch-Setup.exe / Uninstall.exe),
+; not the application's own icon (ip-switch.exe).
+!define MUI_ICON   "imgs\ico\logo.ico"
+!define MUI_UNICON "imgs\ico\logo.ico"
+
 ; Default install dir: Program Files\Ip-Switch
 InstallDir "$PROGRAMFILES\Ip-Switch"
 InstallDirRegKey HKLM "Software\Ip-Switch" "InstallDir"
