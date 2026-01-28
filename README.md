@@ -24,7 +24,17 @@
 
 ## 截图展示
 
-![](./screenshots/demo.png)
+软件配置
+
+<!-- ![](./screenshots/demo.png) -->
+
+![](./screenshots/proxy-config.png)
+
+![]()
+
+配置效果
+
+![](./screenshots/google.png)
 
 ## 开发模式
 
