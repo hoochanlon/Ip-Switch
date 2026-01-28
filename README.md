@@ -1,5 +1,7 @@
 # IP Switch
 
+[English README](./README_EN.md)
+
 <p align="center">
   <img src="./imgs/tarui/logo.png" alt="软件图标" width="100"><br/>
     <img src="./imgs/tarui/red-heart.png" width="50">
@@ -125,8 +127,7 @@ example.com##.ad-banner       # 隐藏页面上 class="ad-banner" 的广告块
 example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的元素
 ```
 
-镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)。
-
+镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)
 
 ## Hosts ＆ DNS 推荐列表
 
