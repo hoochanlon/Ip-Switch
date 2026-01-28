@@ -60,8 +60,6 @@ nullsoft scriptable install system
 
 ## Proxy
 
-镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)。
-
 > [!NOTE]
 > 广告屏蔽规则 ≠ Clash 订阅代理规则，前者是“精细杀广告”，后者是“全局流量分流 + 顺带杀广告域名”。但 Clash 可以导入“广告专用规则集”来增强去广告效果。
 
@@ -106,6 +104,7 @@ example.com##.ad-banner       # 隐藏页面上 class="ad-banner" 的广告块
 example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的元素
 ```
 
+镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)。
 
 ## Hosts ＆ DNS 推荐列表
 
