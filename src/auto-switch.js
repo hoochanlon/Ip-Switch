@@ -257,8 +257,8 @@ async function performAutoSwitch() {
       }
     }
     
-    // 刷新网络信息
-    await refreshNetworkInfo();
+    // 刷新网络信息（只更新数据，不强制重绘，避免正在查看的网卡列表闪烁）
+    await refreshNetworkInfo(false, { skipRender: true });
   } catch (error) {
     console.error('自动切换失败:', error);
   }

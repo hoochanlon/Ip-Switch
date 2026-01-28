@@ -7,7 +7,10 @@ import { t } from './i18n.js';
 
 // 刷新网络信息
 // showLoading: 是否显示加载提示（默认 false，静默刷新）
-export async function refreshNetworkInfo(showLoading = false) {
+// options:
+//   - skipRender: 仅更新状态，不重新渲染 DOM，避免界面“闪一下”
+export async function refreshNetworkInfo(showLoading = false, options = {}) {
+  const { skipRender = false } = options;
   const container = document.getElementById('network-info');
   
   // 只在需要显示加载提示时才清空内容
@@ -56,12 +59,17 @@ export async function refreshNetworkInfo(showLoading = false) {
         state.setSelectedNetworkAdapters(names);
       } else {
         // 如果没有检测到主要网卡，也认为初始化完成，避免反复尝试
-        state.selectedNetworkAdaptersInitialized = true;
+        state.setSelectedNetworkAdaptersInitialized(true);
       }
     }
 
-    // 渲染列表
-    renderNetworkInfo();
+    // 渲染列表（允许调用方选择跳过渲染，避免自动刷新导致选中卡片闪烁）
+    if (!skipRender) {
+      renderNetworkInfo();
+    } else if (container && container.children.length > 0) {
+      // 已经有列表时，做一次“就地更新”而非整体重绘，让统计数据仍然实时变化
+      updateNetworkInfoStatsView();
+    }
 
     // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
     window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
@@ -280,6 +288,21 @@ export function getNetworkTypeInfo(networkType) {
 
 // 简约模式已移除，仅保留完全模式显示
 
+// 辅助：格式化字节数
+function formatBytes(value) {
+  if (value == null || isNaN(value)) return t('unknown');
+  const num = Number(value);
+  if (num < 1024) return `${num} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let size = num;
+  let unitIndex = -1;
+  do {
+    size /= 1024;
+    unitIndex++;
+  } while (size >= 1024 && unitIndex < units.length - 1);
+  return `${size.toFixed(2)} ${units[unitIndex]}`;
+}
+
 // 完全模式：显示所有适配器详情
 function renderFullMode(container) {
   // 获取筛选关键词
@@ -321,25 +344,11 @@ function renderFullMode(container) {
     return 0;
   });
 
-  // 辅助：格式化字节数
-  const formatBytes = (value) => {
-    if (value == null || isNaN(value)) return t('unknown');
-    const num = Number(value);
-    if (num < 1024) return `${num} B`;
-    const units = ['KB', 'MB', 'GB', 'TB'];
-    let size = num;
-    let unitIndex = -1;
-    do {
-      size /= 1024;
-      unitIndex++;
-    } while (size >= 1024 && unitIndex < units.length - 1);
-    return `${size.toFixed(2)} ${units[unitIndex]}`;
-  };
-
   sortedAdapters.forEach(adapter => {
     const card = document.createElement('div');
     const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
     card.className = `network-card ${typeInfo.class}-card`;
+    card.setAttribute('data-adapter-name', adapter.name);
     
     const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
     const status = adapter.is_enabled ? t('connected') : t('disconnected');
@@ -358,49 +367,112 @@ function renderFullMode(container) {
       <div class="network-details">
         <div class="detail-row">
           <span class="label">${t('ipStatus')}:</span>
-          <span class="value">${ipType}</span>
+          <span class="value value-ip-type">${ipType}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('macAddress')}:</span>
-          <span class="value">${adapter.mac_address || t('unknown')}</span>
+          <span class="value value-mac-address">${adapter.mac_address || t('unknown')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('ipAddressLabel')}:</span>
-          <span class="value">${adapter.ip_address || t('notConfigured')}</span>
+          <span class="value value-ip-address">${adapter.ip_address || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('subnetMaskLabel')}:</span>
-          <span class="value">${adapter.subnet_mask || t('notConfigured')}</span>
+          <span class="value value-subnet-mask">${adapter.subnet_mask || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('gatewayLabel')}:</span>
-          <span class="value">${adapter.gateway || t('notConfigured')}</span>
+          <span class="value value-gateway">${adapter.gateway || t('notConfigured')}</span>
         </div>
         <div class="detail-row dns-row">
           <span class="label">${t('dnsServers')}</span>
-          <span class="value">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
+          <span class="value value-dns-servers">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('mediaStateLabel')}:</span>
-          <span class="value">${adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled')}</span>
+          <span class="value value-media-state">${adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('speedLabel')}:</span>
-          <span class="value">${adapter.link_speed || t('unknown')}</span>
+          <span class="value value-speed">${adapter.link_speed || t('unknown')}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('bytesReceivedLabel')}:</span>
-          <span class="value">${formatBytes(adapter.bytes_received)}</span>
+          <span class="value value-bytes-received">${formatBytes(adapter.bytes_received)}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('bytesSentLabel')}:</span>
-          <span class="value">${formatBytes(adapter.bytes_sent)}</span>
+          <span class="value value-bytes-sent">${formatBytes(adapter.bytes_sent)}</span>
         </div>
       </div>
       <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
     `;
     
     container.appendChild(card);
+  });
+}
+
+// 仅根据最新 state.currentNetworkInfo，就地更新卡片里的动态字段，避免整体重绘导致闪烁
+export function updateNetworkInfoStatsView() {
+  if (!state.currentNetworkInfo) return;
+  const container = document.getElementById('network-info');
+  if (!container) return;
+
+  const cards = Array.from(container.querySelectorAll('.network-card'));
+  if (cards.length === 0) return;
+
+  const cardMap = new Map();
+  cards.forEach(card => {
+    const name = card.getAttribute('data-adapter-name');
+    if (name) {
+      cardMap.set(name, card);
+    }
+  });
+
+  state.currentNetworkInfo.forEach(adapter => {
+    const card = cardMap.get(adapter.name);
+    if (!card) return;
+
+    const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
+    const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
+    const status = adapter.is_enabled ? t('connected') : t('disconnected');
+
+    // 状态徽章
+    const statusBadge = card.querySelector('.status-badge');
+    if (statusBadge) {
+      statusBadge.textContent = status;
+      statusBadge.classList.toggle('enabled', !!adapter.is_enabled);
+      statusBadge.classList.toggle('disabled', !adapter.is_enabled);
+    }
+
+    // 顶部类型徽章（图标和文字）
+    const typeBadge = card.querySelector('.network-type-badge');
+    if (typeBadge) {
+      typeBadge.className = `network-type-badge ${typeInfo.class}`;
+      const iconEl = typeBadge.querySelector('.network-icon');
+      if (iconEl) {
+        iconEl.src = typeInfo.icon;
+        iconEl.alt = typeInfo.label;
+      }
+      // 文本在模板里直接跟在 img 后面，保持不变或按需更新
+    }
+
+    const setText = (selector, text) => {
+      const el = card.querySelector(selector);
+      if (el) el.textContent = text;
+    };
+
+    setText('.value-ip-type', ipType);
+    setText('.value-mac-address', adapter.mac_address || t('unknown'));
+    setText('.value-ip-address', adapter.ip_address || t('notConfigured'));
+    setText('.value-subnet-mask', adapter.subnet_mask || t('notConfigured'));
+    setText('.value-gateway', adapter.gateway || t('notConfigured'));
+    setText('.value-dns-servers', adapter.dns_servers?.join(', ') || t('notConfigured'));
+    setText('.value-media-state', adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled'));
+    setText('.value-speed', adapter.link_speed || t('unknown'));
+    setText('.value-bytes-received', formatBytes(adapter.bytes_received));
+    setText('.value-bytes-sent', formatBytes(adapter.bytes_sent));
   });
 }
 

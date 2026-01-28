@@ -94,7 +94,8 @@ function initNetworkStatus() {
     if (now - lastBackendRefreshAt < 1000) return null;
 
     lastBackendRefreshAt = now;
-    pendingBackendRefresh = refreshNetworkInfo(false).finally(() => {
+    // 后台静默刷新：仅更新状态，不重绘界面，避免网卡列表闪烁
+    pendingBackendRefresh = refreshNetworkInfo(false, { skipRender: true }).finally(() => {
       pendingBackendRefresh = null;
     });
     return pendingBackendRefresh;
@@ -200,11 +201,11 @@ export async function checkNetworkStatusWithBackend() {
     // 更新 UI
     await updateNetworkStatusUI(isOnline);
     
-    // 如果网络恢复，自动刷新网络信息
+    // 如果网络恢复，自动刷新网络信息（仅更新状态，避免界面闪烁）
     if (isOnline && state.currentNetworkInfo) {
       // 延迟刷新，避免频繁请求
       setTimeout(() => {
-        refreshNetworkInfo();
+        refreshNetworkInfo(false, { skipRender: true });
       }, 1000);
     }
   } catch (error) {

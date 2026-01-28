@@ -38,6 +38,11 @@ export function initSelectedNetworkAdapters() {
   }
 }
 
+// 单独设置“是否已完成网卡筛选初始化”的标记
+export function setSelectedNetworkAdaptersInitialized(value) {
+  selectedNetworkAdaptersInitialized = !!value;
+}
+
 // 设置选中的网卡集合（传 null 表示全选）
 export function setSelectedNetworkAdapters(value) {
   if (value === null) {
