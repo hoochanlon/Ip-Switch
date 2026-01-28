@@ -41,10 +41,13 @@ npm run tauri build
 
 **hosts**
 
+
+
 * [ineo6/hosts](https://github.com/ineo6/hosts)
 * [国立台湾大学DNS](https://isms.ntu.edu.tw/DNSlist.html)
 * [HOSTS Blocker常用列表](https://jplop.neocities.org/teac_hosts_block)
 * [StevenBlack/hosts](https://github.com/StevenBlack/hosts)
+* [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
 
 **DNS**
 
@@ -52,4 +55,4 @@ https://www.dolingou.com/article/dns-servers-guide
 
 * [DNS SB](https://dns.sb)
 * [Next DNS](https://my.nextdns.io/a9bdef/setup)
-* [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
+* [Quad9](https://quad9.net/)
