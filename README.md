@@ -75,6 +75,15 @@ nullsoft scriptable install system
 > [!NOTE]
 > 广告屏蔽规则 ≠ Clash 订阅代理规则，前者是“精细杀广告”，后者是“全局流量分流 + 顺带杀广告域名”。但 Clash 可以导入“广告专用规则集”来增强去广告效果。
 
+PAC vs 广告屏蔽规则对比
+
+| 项目     | 主要作用             | 常用工具                  | 能挡什么          | 路径例子                     | 比喻     |
+|----------|----------------------|---------------------------|-------------------|------------------------------|----------|
+| PAC     | 自动分流/直连    | Omega、Clash   | 域名/IP 分流     | 本地: 127.0.0.1:21883/pac<br>远程: pac.机场.com | 交通警察 |
+| 广告规则 | 杀广告/追踪器   | Origin、AdGuard    | 域名+路径+隐藏   | 订阅链接或插件内规则         | 清洁工   |
+
+
+PAC、广告屏蔽文本文件相关项目
 
 * [gfwlist/gfwlist](https://github.com/gfwlist/gfwlist)
 * [PaPerseller/chn-iplist](https://github.com/PaPerseller/chn-iplist)
@@ -117,14 +126,6 @@ example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的�
 ```
 
 镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)。
-
-
-### PAC vs 广告屏蔽规则对比
-
-| 项目     | 主要作用             | 常用工具                  | 能挡什么          | 路径例子                     | 比喻     |
-|----------|----------------------|---------------------------|-------------------|------------------------------|----------|
-| PAC     | 自动分流/直连    | Omega、Clash   | 域名/IP 分流     | 本地: 127.0.0.1:21883/pac<br>远程: pac.机场.com | 交通警察 |
-| 广告规则 | 杀广告/追踪器   | Origin、AdGuard    | 域名+路径+隐藏   | 订阅链接或插件内规则         | 清洁工   |
 
 
 ## Hosts ＆ DNS 推荐列表
