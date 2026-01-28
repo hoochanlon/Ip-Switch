@@ -70,3 +70,6 @@ scenes/
 *.tmp
 *.temp
 .cache/
+
+# NSIS output
+Ip-Switch-Setup.exe
