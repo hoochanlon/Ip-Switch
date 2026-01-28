@@ -7,6 +7,7 @@ export let currentScene = null;
 export let networkStatus = null;
 export let lastTrayColor = null; // 保存上次的托盘颜色，用于网络恢复时恢复
 export let selectedNetworkAdapters = null; // Set<string> | null（null 表示全选/不做勾选过滤）
+export let selectedNetworkAdaptersInitialized = false; // 是否已经做过“默认初始化”
 
 // 设置网络信息
 export function setCurrentNetworkInfo(info) {
@@ -20,16 +21,20 @@ export function initSelectedNetworkAdapters() {
     if (!raw) {
       // 默认按“主要网卡”初始化（WiFi + 以太网），实际列表在第一次刷新网络信息后由 network.js 设置
       selectedNetworkAdapters = null;
+      selectedNetworkAdaptersInitialized = false;
       return;
     }
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) {
       selectedNetworkAdapters = new Set(arr.filter(Boolean));
+      selectedNetworkAdaptersInitialized = true;
     } else {
       selectedNetworkAdapters = null;
+      selectedNetworkAdaptersInitialized = false;
     }
   } catch {
     selectedNetworkAdapters = null;
+    selectedNetworkAdaptersInitialized = false;
   }
 }
 
@@ -37,10 +42,12 @@ export function initSelectedNetworkAdapters() {
 export function setSelectedNetworkAdapters(value) {
   if (value === null) {
     selectedNetworkAdapters = null;
+    selectedNetworkAdaptersInitialized = true; // 用户主动选择“全选”
     localStorage.removeItem('selectedNetworkAdapters');
     return;
   }
   selectedNetworkAdapters = new Set(Array.from(value || []).filter(Boolean));
+  selectedNetworkAdaptersInitialized = true;
   localStorage.setItem('selectedNetworkAdapters', JSON.stringify(Array.from(selectedNetworkAdapters)));
 }
 

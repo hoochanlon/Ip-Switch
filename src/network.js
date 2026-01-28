@@ -27,8 +27,9 @@ export async function refreshNetworkInfo(showLoading = false) {
       return;
     }
     
-    // 默认初始化筛选：第一次加载时仅勾选主要网卡（WiFi + 以太网）
-    if (state.selectedNetworkAdapters === null && Array.isArray(state.currentNetworkInfo)) {
+    // 默认初始化筛选：仅在“尚未初始化过”时，按主要网卡（WiFi + 以太网）做一次勾选
+    // 之后用户的任何选择（包含“全选”）都不会被刷新逻辑覆盖
+    if (!state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
       const mainAdapters = state.currentNetworkInfo.filter(adapter => {
         const name = adapter.name.toLowerCase();
         const networkType = (adapter.network_type || '').toLowerCase();
@@ -53,6 +54,9 @@ export async function refreshNetworkInfo(showLoading = false) {
       if (mainAdapters.length > 0) {
         const names = new Set(mainAdapters.map(a => a.name));
         state.setSelectedNetworkAdapters(names);
+      } else {
+        // 如果没有检测到主要网卡，也认为初始化完成，避免反复尝试
+        state.selectedNetworkAdaptersInitialized = true;
       }
     }
 
