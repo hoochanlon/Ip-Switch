@@ -3,6 +3,8 @@
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 let appWindow = null;
+let syncMaximizeTimer = null;
+let hasNativeWindowListener = false;
 
 // 获取窗口实例
 async function getWindow() {
@@ -10,6 +12,13 @@ async function getWindow() {
     appWindow = getCurrentWebviewWindow();
   }
   return appWindow;
+}
+
+function scheduleSyncMaximizeState(delay = 80) {
+  if (syncMaximizeTimer) clearTimeout(syncMaximizeTimer);
+  syncMaximizeTimer = setTimeout(() => {
+    updateMaximizeButton();
+  }, delay);
 }
 
 // 最小化窗口
@@ -43,7 +52,7 @@ window.handleMaximize = async function(e) {
     } else {
       await window.maximize();
     }
-    updateMaximizeButton();
+    await updateMaximizeButton();
   } catch (error) {
     console.error('最大化/还原窗口失败:', error);
   }
@@ -73,17 +82,32 @@ export async function initWindowControls() {
   // 初始化最大化按钮状态
   await updateMaximizeButton();
   
-  // 注意：onResized 可能需要特定权限，如果不需要实时更新，可以在按钮点击时更新
-  // 如果需要监听窗口大小变化，可以使用 window resize 事件
+  // 优先使用 Tauri 原生窗口事件（更稳定），其次再退回到浏览器 resize
   try {
-    window.addEventListener('resize', async () => {
-      // 延迟更新，避免频繁调用
-      setTimeout(() => {
-        updateMaximizeButton();
-      }, 100);
-    });
+    const w = await getWindow();
+    if (typeof w.onResized === 'function') {
+      hasNativeWindowListener = true;
+      await w.onResized(() => scheduleSyncMaximizeState());
+    }
+    // 某些平台提供专门的最大化事件（存在则使用）
+    if (typeof w.onMaximized === 'function') {
+      hasNativeWindowListener = true;
+      await w.onMaximized(() => scheduleSyncMaximizeState(0));
+    }
+    if (typeof w.onUnmaximized === 'function') {
+      hasNativeWindowListener = true;
+      await w.onUnmaximized(() => scheduleSyncMaximizeState(0));
+    }
   } catch (error) {
-    console.warn('无法监听窗口大小变化:', error);
+    // ignore and fallback below
+  }
+
+  if (!hasNativeWindowListener) {
+    try {
+      window.addEventListener('resize', () => scheduleSyncMaximizeState());
+    } catch (error) {
+      console.warn('无法监听窗口大小变化:', error);
+    }
   }
 }
 
@@ -96,6 +120,12 @@ async function updateMaximizeButton() {
     
     if (maximizeBtn && maximizeIcon) {
       const isMaximized = await window.isMaximized();
+      // 给 CSS 一个可靠的开关（最大化时布局更宽）
+      try {
+        document.body?.classList?.toggle('is-maximized', !!isMaximized);
+      } catch {
+        // ignore
+      }
       if (isMaximized) {
         // 还原图标（两个重叠的矩形）
         maximizeIcon.innerHTML = `
@@ -123,6 +153,12 @@ export async function initWindowDrag() {
   
   const window = await getWindow();
   const titlebarLeft = document.querySelector('.titlebar-left');
+
+  // 双击标题栏空白区域：最大化/还原（符合原生窗口习惯）
+  dragArea.addEventListener('dblclick', (e) => {
+    if (e.target.closest('.titlebar-controls') || e.target.closest('button')) return;
+    window.handleMaximize?.(e);
+  });
   
   // 只在左侧标题区域启用拖拽
   if (titlebarLeft) {

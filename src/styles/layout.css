@@ -31,8 +31,14 @@
 
 .main-content {
   display: grid;
-  grid-template-columns: 1fr 520px; /* 增加右侧宽度，从450px改为520px */
+  /* 右侧场景管理区：可随窗口变宽（避免最大化后仍固定 520px） */
+  grid-template-columns: minmax(0, 1fr) clamp(520px, 38vw, 760px);
   gap: 16px;
+}
+
+/* 最大化时再进一步放宽右侧内容框 */
+body.is-maximized .main-content {
+  grid-template-columns: minmax(0, 1fr) clamp(560px, 42vw, 900px);
 }
 
 .network-section {
