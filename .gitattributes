@@ -7,21 +7,21 @@
 # - linguist-detectable: 强制某目录可被统计（通常不需要，仅作为保险）
 
 # --- Build artifacts (exclude) ---
-# dist/** linguist-generated=true
-# src-tauri/target/** linguist-generated=true
-# node_modules/** linguist-generated=true
+dist/** linguist-generated=true
+src-tauri/target/** linguist-generated=true
+node_modules/** linguist-generated=true
 
 # --- Frontend (exclude from language stats so Rust becomes dominant) ---
-# src/** linguist-vendored=true
-# index.html linguist-vendored=true
-# vite.config.js linguist-vendored=true
+src/** linguist-vendored=true
+index.html linguist-vendored=true
+vite.config.js linguist-vendored=true
 
 # --- JSON / lockfiles (exclude from language stats) ---
 # 使用 linguist-detectable=false 更直接地让 GitHub 不统计这些文件
-# *.json linguist-detectable=false
-# *.lock linguist-detectable=false
+*.json linguist-detectable=false
+*.lock linguist-detectable=false
 
 # --- Rust (force recognize as Rust) ---
-# src-tauri/** linguist-language=Rust
-# src-tauri/** linguist-detectable=true
+src-tauri/** linguist-language=Rust
+src-tauri/** linguist-detectable=true
 
