@@ -9,7 +9,7 @@
 # --- Build artifacts (exclude) ---
 dist/** linguist-generated=true
 src-tauri/target/** linguist-generated=true
-# node_modules/** linguist-generated=true
+node_modules/** linguist-generated=true
 
 # --- Frontend (exclude from language stats so Rust becomes dominant) ---
 src/** linguist-vendored=true
@@ -23,5 +23,5 @@ vite.config.js linguist-vendored=true
 
 # --- Rust (force recognize as Rust) ---
 src-tauri/** linguist-language=Rust
-src-tauri/** linguist-detectable=true
+# src-tauri/** linguist-detectable=true
 
