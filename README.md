@@ -1,10 +1,9 @@
 # IP Switch
 
 <p align="center">
-  <img src="./screenshots/logo.png" alt="软件图标" width="100"><br/>
-  基于 Tauri 的 IP、Hosts、Proxy 配置修改切换器，具有场景切换功能。
+  <img src="./imgs/tarui/logo.png" alt="软件图标" width="100"><br/>
+  随心切换场景，Hosts 与代理智能协同，实时流量监控 + 网络状态提醒，让每一次上网都自由而从容。
 </p>
-
 
 ## 功能特性
 
@@ -136,3 +135,9 @@ example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的�
 * [dolingou - Dns Servers Guide](https://www.dolingou.com/article/dns-servers-guide)
 
 推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4) 
+
+<p align="center">
+  <img src="./imgs/tarui/red-heart.png" width="100">
+  <img src="./imgs/tarui/add.png" height="100"> 
+   <img src="./imgs/tarui/tarui.png" height="100"> 
+</p>
