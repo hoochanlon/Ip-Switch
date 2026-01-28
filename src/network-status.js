@@ -8,10 +8,12 @@ class NetworkStatus {
     this.callback = callback;
     this.checkInterval = options.checkInterval || 5000; // 默认5秒检查一次
     this.timeout = options.timeout || 3000; // 请求超时时间
+    // 避免外部站点资源（如 google favicon）触发 WebView2 Tracking Prevention 噪声日志。
+    // 这里用无跨域依赖的“轻量请求”目标（纯 HTTPS endpoint），并加 no-cors/超时控制。
     this.testUrls = options.testUrls || [
-      'https://www.google.com/favicon.ico',
-      'https://www.baidu.com/favicon.ico',
-      'https://1.1.1.1/favicon.ico' // Cloudflare DNS
+      'https://1.1.1.1/',
+      'https://www.cloudflare.com/',
+      'https://www.microsoft.com/'
     ];
     this.isOnline = navigator.onLine;
     this.isChecking = false;
@@ -76,12 +78,7 @@ class NetworkStatus {
 
   testImageLoad() {
     return new Promise((resolve) => {
-      // 尝试多个测试 URL
-      const testUrls = [
-        'https://www.google.com/favicon.ico',
-        'https://www.baidu.com/favicon.ico',
-        'https://1.1.1.1/favicon.ico'
-      ];
+      const testUrls = this.testUrls;
       
       let completed = 0;
       let hasSuccess = false;
@@ -93,30 +90,28 @@ class NetworkStatus {
         }
       };
       
-      // 尝试每个 URL
-      testUrls.forEach(url => {
-        const img = new Image();
-        const timeoutId = setTimeout(() => {
-          img.onload = null;
-          img.onerror = null;
-          checkComplete();
-        }, this.timeout);
-        
-        img.onload = () => {
-          clearTimeout(timeoutId);
-          if (!hasSuccess) {
-            hasSuccess = true;
-            resolve(true);
-          }
-        };
-        
-        img.onerror = () => {
-          clearTimeout(timeoutId);
-          checkComplete();
-        };
-        
-        // 添加时间戳避免缓存
-        img.src = url + '?t=' + Date.now();
+      // 使用 fetch(no-cors) 来做“能否建立 HTTPS 连接”的探测，避免加载第三方图片造成追踪防护提示。
+      testUrls.forEach((url) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        fetch(`${url}?t=${Date.now()}`, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+          .then(() => {
+            clearTimeout(timeoutId);
+            if (!hasSuccess) {
+              hasSuccess = true;
+              resolve(true);
+            }
+          })
+          .catch(() => {
+            clearTimeout(timeoutId);
+            checkComplete();
+          });
       });
     });
   }

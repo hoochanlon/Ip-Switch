@@ -12,12 +12,19 @@ import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAbou
 import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
 import { initHostsScheduledUpdate } from './hosts.js';
 import { initWindowControls, initWindowDrag } from './window-controls.js';
-import { initI18n, toggleLanguage, getLanguage } from './i18n.js';
+import { initI18n, toggleLanguage, getLanguage, t } from './i18n.js';
 
 // 初始化
 async function init() {
   // 初始化 i18n
   initI18n();
+
+  // 同步托盘提示文本（支持后续语言切换）
+  try {
+    await invoke('set_tray_tooltip', { tooltip: t('appTitle') });
+  } catch {
+    // ignore
+  }
 
   // 初始化主题
   initTheme();
@@ -259,6 +266,15 @@ function setupEventListeners() {
       }
     });
   }
+
+  // 语言变化时同步托盘提示文字
+  window.addEventListener('languageChanged', async () => {
+    try {
+      await invoke('set_tray_tooltip', { tooltip: t('appTitle') });
+    } catch {
+      // ignore
+    }
+  });
   
   // 主题切换按钮
   const themeToggleBtn = document.getElementById('theme-toggle-btn');

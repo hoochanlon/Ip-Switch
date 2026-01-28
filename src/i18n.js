@@ -338,23 +338,28 @@ function detectSystemLanguage() {
     ? navigator.languages
     : [navigator.language].filter(Boolean);
   const first = String(langs[0] || '').toLowerCase();
+  // 跟随系统：只要是 zh-*（中国/香港/台湾/新加坡等）都显示中文，其它默认英文
   return first.startsWith('zh') ? 'zh' : 'en';
 }
 
 export function getLanguage() {
   const raw = localStorage.getItem(STORAGE_KEY);
+  // 允许三种模式：'zh' | 'en' | 'auto'
+  // - auto（或未设置）：跟随系统语言
+  // - zh/en：用户手动指定
   if (raw === 'en' || raw === 'zh') return raw;
   return detectSystemLanguage();
 }
 
 export function setLanguage(lang) {
-  const next = lang === 'en' ? 'en' : 'zh';
+  const next = lang === 'en' ? 'en' : lang === 'auto' ? 'auto' : 'zh';
   localStorage.setItem(STORAGE_KEY, next);
   applyTranslations(document);
   window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang: next } }));
 }
 
 export function toggleLanguage() {
+  // 基于“当前生效语言”切换（auto 模式下也能正常切）
   setLanguage(getLanguage() === 'zh' ? 'en' : 'zh');
 }
 

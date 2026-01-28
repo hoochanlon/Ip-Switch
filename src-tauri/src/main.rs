@@ -73,10 +73,10 @@ fn main() {
     
     tauri::Builder::default()
         .setup(|app| {
-            // 创建系统托盘菜单
-            let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
-            let hide_item = MenuItem::with_id(app, "hide", "隐藏窗口", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            // 创建系统托盘菜单（统一使用英文，避免中英文混杂）
+            let show_item = MenuItem::with_id(app, "show", "Show window", true, None::<&str>)?;
+            let hide_item = MenuItem::with_id(app, "hide", "Hide window", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             
             let menu = Menu::with_items(app, &[
                 &show_item,
@@ -101,7 +101,7 @@ fn main() {
             let tray_icon = TrayIconBuilder::new()
                 .menu(&menu)
                 .icon(icon)
-                .tooltip("IP 配置管理器")
+                .tooltip("IP Switch")
                 .build(app)?;
             
             // 将托盘图标句柄存储到应用状态中，以便后续更新
@@ -193,6 +193,7 @@ fn main() {
             network::ping_test,
             network::auto_switch_network,
             open_devtools,
+            set_tray_tooltip,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -215,6 +216,21 @@ async fn set_dns_servers(adapter_name: String, dns: Vec<String>) -> Result<(), S
 async fn open_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
     window.open_devtools();
     Ok(())
+}
+
+/// 更新托盘提示文字（用于语言切换/统一标题）
+#[tauri::command]
+async fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(tray_handle) = app.try_state::<std::sync::Mutex<tauri::tray::TrayIcon>>() {
+        if let Ok(tray) = tray_handle.lock() {
+            tray
+                .set_tooltip(Some(tooltip))
+                .map_err(|e| format!("设置托盘提示失败: {}", e))?;
+            return Ok(());
+        }
+    }
+    Err("无法获取托盘图标句柄".to_string())
 }
 
 // 加载托盘图标（优先使用 SVG，失败则使用默认图标）

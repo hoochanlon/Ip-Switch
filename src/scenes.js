@@ -87,6 +87,12 @@ export async function renderScenes() {
   }
 }
 
+// 语言切换时，重新渲染场景区域以应用最新文案
+window.addEventListener('languageChanged', () => {
+  // 忽略返回 Promise
+  renderScenes();
+});
+
 // 新建场景
 window.createScene = async function() {
   if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
