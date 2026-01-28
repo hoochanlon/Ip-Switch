@@ -1,8 +1,13 @@
 # IP Switch
 
-基于 Tauri 的 IP、Hosts、代理配置修改器，具有场景切换功能。
+基于 Tauri 的 IP、Hosts、Proxy 配置修改切换器，具有场景切换功能。
+
+> [!NOTE]
+> ⚠️ **需要管理员权限运行**：修改网络配置、Hosts文件和代理设置需要管理员权限。
 
 ![](./screenshots/2026-01-28_18-14-15.png)
+
+下载：https://github.com/hoochanlon/Ip-Switch/releases
 
 ## 功能特性
 
@@ -13,9 +18,6 @@
 - ✅ 场景切换（保存/加载配置场景）
 
 ## 开发模式
-
-> [!NOTE]
-> ⚠️ **需要管理员权限运行**：修改网络配置、Hosts文件和代理设置需要管理员权限。
 
 环境要求
 
@@ -35,3 +37,19 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## hosts ＆ DNS
+
+**hosts**
+
+* [ineo6/hosts](https://github.com/ineo6/hosts)
+* [国立台湾大学DNS](https://isms.ntu.edu.tw/DNSlist.html)
+* [HOSTS Blocker常用列表](https://jplop.neocities.org/teac_hosts_block)
+* [StevenBlack/hosts](https://github.com/StevenBlack/hosts)
+
+**DNS**
+
+https://www.dolingou.com/article/dns-servers-guide
+
+* [DNS SB](https://dns.sb)
+* [Next DNS](https://my.nextdns.io/a9bdef/setup)
+* [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
