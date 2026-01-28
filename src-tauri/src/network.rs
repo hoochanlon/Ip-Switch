@@ -34,6 +34,14 @@ pub struct NetworkAdapter {
     pub gateway: Option<String>,
     pub dns_servers: Option<Vec<String>>,
     pub mac_address: Option<String>,
+    /// 连接持续时间（格式: "hh:mm:ss"，仅在 Status 为 Up 时有值）
+    pub duration: Option<String>,
+    /// 链路速度（例如 "1 Gbps"）
+    pub link_speed: Option<String>,
+    /// 已发送字节数
+    pub bytes_sent: Option<u64>,
+    /// 已接收字节数
+    pub bytes_received: Option<u64>,
 }
 
 #[tauri::command]
@@ -44,7 +52,31 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
     let output = powershell_cmd()
         .args(&[
             "-Command",
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-NetAdapter | Select-Object Name, InterfaceDescription, Status, MacAddress | ConvertTo-Json -Depth 10"
+            // 合并适配器基本信息 + 统计信息（速度/收发字节/持续时间）
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
+            $adapters = Get-NetAdapter; \
+            $stats = Get-NetAdapterStatistics; \
+            $result = @(); \
+            foreach ($adapter in $adapters) { \
+              $stat = $stats | Where-Object { $_.Name -eq $adapter.Name } | Select-Object -First 1; \
+              $duration = $null; \
+              if ($adapter.Status -eq 'Up' -and $adapter.LinkUpTime) { \
+                $ts = New-TimeSpan -Start $adapter.LinkUpTime -End (Get-Date); \
+                $duration = $ts.ToString('hh\\:mm\\:ss'); \
+              } \
+              $obj = [PSCustomObject]@{ \
+                Name = $adapter.Name; \
+                InterfaceDescription = $adapter.InterfaceDescription; \
+                Status = $adapter.Status; \
+                MacAddress = $adapter.MacAddress; \
+                LinkSpeed = $adapter.LinkSpeed; \
+                Duration = $duration; \
+                BytesSent = if ($stat) { [int64]$stat.SentBytes } else { $null }; \
+                BytesReceived = if ($stat) { [int64]$stat.ReceivedBytes } else { $null }; \
+              }; \
+              $result += $obj; \
+            }; \
+            $result | ConvertTo-Json -Depth 10"
         ])
         .output()
         .map_err(|e| format!("执行命令失败: {}", e))?;
@@ -118,6 +150,20 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
             .as_str()
             .map(|s| s.to_string());
 
+        // 连接持续时间（可能为 null）
+        let duration = adapter_json["Duration"]
+            .as_str()
+            .map(|s| s.to_string());
+
+        // 链路速度（直接使用 PowerShell 返回的字符串，如 "1 Gbps"）
+        let link_speed = adapter_json["LinkSpeed"]
+            .as_str()
+            .map(|s| s.to_string());
+
+        // 已发送/已接收字节数
+        let bytes_sent = adapter_json["BytesSent"].as_i64().map(|v| v as u64);
+        let bytes_received = adapter_json["BytesReceived"].as_i64().map(|v| v as u64);
+
         // 从缓存中获取IP配置信息
         let ip_config = all_configs.get(&name).cloned().unwrap_or_else(|| {
             // 如果缓存中没有，尝试单独获取（作为后备）
@@ -143,6 +189,10 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
             gateway: ip_config.gateway,
             dns_servers: ip_config.dns_servers,
             mac_address: mac,
+            duration,
+            link_speed,
+            bytes_sent,
+            bytes_received,
         });
     }
 

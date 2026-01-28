@@ -127,6 +127,14 @@ const DICT = {
     ethernet: 'Ethernet',
     bluetooth: 'Bluetooth',
     other: 'Other',
+    // 适配器统计 / 状态
+    speedLabel: '速度',
+    durationLabel: '持续时间',
+    bytesSentLabel: '已发送',
+    bytesReceivedLabel: '已接收',
+    mediaStateLabel: '媒体状态',
+    mediaStateEnabled: '已启用',
+    mediaStateDisabled: '已禁用',
 
     // 自动切换
     autoSwitchConfigTitle: '自动双向切换配置',
@@ -290,6 +298,14 @@ const DICT = {
     ethernet: 'Ethernet',
     bluetooth: 'Bluetooth',
     other: 'Other',
+    // Adapter statistics / state
+    speedLabel: 'Speed',
+    durationLabel: 'Duration',
+    bytesSentLabel: 'Bytes sent',
+    bytesReceivedLabel: 'Bytes received',
+    mediaStateLabel: 'Media state',
+    mediaStateEnabled: 'Enabled',
+    mediaStateDisabled: 'Disabled',
 
     // Auto switch
     autoSwitchConfigTitle: 'Auto Switch (2-way) Configuration',

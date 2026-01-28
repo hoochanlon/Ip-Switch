@@ -317,6 +317,21 @@ function renderFullMode(container) {
     return 0;
   });
 
+  // 辅助：格式化字节数
+  const formatBytes = (value) => {
+    if (value == null || isNaN(value)) return t('unknown');
+    const num = Number(value);
+    if (num < 1024) return `${num} B`;
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let size = num;
+    let unitIndex = -1;
+    do {
+      size /= 1024;
+      unitIndex++;
+    } while (size >= 1024 && unitIndex < units.length - 1);
+    return `${size.toFixed(2)} ${units[unitIndex]}`;
+  };
+
   sortedAdapters.forEach(adapter => {
     const card = document.createElement('div');
     const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
@@ -360,6 +375,22 @@ function renderFullMode(container) {
         <div class="detail-row dns-row">
           <span class="label">${t('dnsServers')}</span>
           <span class="value" title="${adapter.dns_servers?.join(', ') || ''}">${adapter.dns_servers?.join(', ') || t('notConfigured')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">${t('mediaStateLabel')}:</span>
+          <span class="value">${adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">${t('speedLabel')}:</span>
+          <span class="value">${adapter.link_speed || t('unknown')}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">${t('bytesReceivedLabel')}:</span>
+          <span class="value">${formatBytes(adapter.bytes_received)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">${t('bytesSentLabel')}:</span>
+          <span class="value">${formatBytes(adapter.bytes_sent)}</span>
         </div>
       </div>
       <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
