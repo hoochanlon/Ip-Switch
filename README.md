@@ -39,11 +39,21 @@ npm run tauri dev
 npm run tauri build
 ```
 
+NSIS 封装打包
+
+nullsoft scriptable install system
+
+软件下载：
+
+* https://www.mefcl.com/nsis-3-0-5.html
+* https://www.cnblogs.com/NSIS/p/16581122.html
+
+操作过程：编译 NSI 脚本 > 文件 > 加载脚本 > ip-switch.nsi
+
+
 ## hosts ＆ DNS
 
 **hosts**
-
-
 
 * [ineo6/hosts](https://github.com/ineo6/hosts)
 * [国立台湾大学DNS](https://isms.ntu.edu.tw/DNSlist.html)

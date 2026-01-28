@@ -75,6 +75,10 @@ Section "MainSection" SEC_Main
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "DisplayVersion" "${APP_VERSION}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "Publisher" "${APP_PUBLISHER}"
+  ; Icon and estimated size (for Control Panel)
+  WriteRegStr   HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "DisplayIcon" "$INSTDIR\${APP_EXE}"
+  ; EstimatedSize is in KB; here set to ~8 MB
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "EstimatedSize" 8192
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Ip-Switch" "NoRepair" 1
 
