@@ -12,9 +12,9 @@ dist/** linguist-generated=true
 # node_modules/** linguist-generated=true
 
 # --- Frontend (exclude from language stats so Rust becomes dominant) ---
-src/** linguist-vendored=true
-index.html linguist-vendored=true
-vite.config.js linguist-vendored=true
+# src/** linguist-vendored=true
+# index.html linguist-vendored=true
+# vite.config.js linguist-vendored=true
 
 # --- JSON / lockfiles (exclude from language stats) ---
 # 使用 linguist-detectable=false 更直接地让 GitHub 不统计这些文件
