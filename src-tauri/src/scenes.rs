@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use tauri::Manager;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scene {
@@ -30,23 +31,73 @@ pub struct ProxyConfig {
 }
 
 fn get_scenes_dir() -> PathBuf {
-    let mut path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("."));
+    // legacy: scenes folder next to the executable
+    let mut path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
     path.pop();
     path.push("scenes");
     path
 }
 
-fn ensure_scenes_dir() -> Result<PathBuf, String> {
-    let dir = get_scenes_dir();
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("创建场景目录失败: {}", e))?;
+fn get_scenes_dir_in_documents(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // Prefer Documents\IP Switch\scenes on Windows (also works cross-platform when available).
+    // Fallback to app data dir if documents dir is unavailable.
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| format!("获取用户目录失败: {}", e))?;
+    Ok(base.join("IP Switch").join("scenes"))
+}
+
+fn is_dir_empty(dir: &PathBuf) -> bool {
+    match fs::read_dir(dir) {
+        Ok(mut it) => it.next().is_none(),
+        Err(_) => true,
+    }
+}
+
+fn migrate_legacy_scenes_if_needed(legacy: &PathBuf, target: &PathBuf) -> Result<(), String> {
+    if !legacy.exists() {
+        return Ok(());
+    }
+    // Only migrate if target is empty (avoid overwriting user data)
+    if target.exists() && !is_dir_empty(target) {
+        return Ok(());
+    }
+
+    fs::create_dir_all(target).map_err(|e| format!("创建场景目录失败: {}", e))?;
+    let entries = fs::read_dir(legacy).map_err(|e| format!("读取旧场景目录失败: {}", e))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取旧场景文件失败: {}", e))?;
+        let from = entry.path();
+        if !from.is_file() {
+            continue;
+        }
+        let Some(name) = from.file_name() else { continue; };
+        let to = target.join(name);
+        // Try rename first; fallback to copy+remove (cross-device / permissions)
+        if fs::rename(&from, &to).is_err() {
+            fs::copy(&from, &to).map_err(|e| format!("迁移场景文件失败: {}", e))?;
+            let _ = fs::remove_file(&from);
+        }
+    }
+    Ok(())
+}
+
+fn ensure_scenes_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = get_scenes_dir_in_documents(app)?;
+    fs::create_dir_all(&dir).map_err(|e| format!("创建场景目录失败: {}", e))?;
+
+    // Best-effort migration from legacy location (exe\scenes)
+    let legacy = get_scenes_dir();
+    let _ = migrate_legacy_scenes_if_needed(&legacy, &dir);
+
     Ok(dir)
 }
 
 #[tauri::command]
-pub async fn get_scenes() -> Result<Vec<Scene>, String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn get_scenes(app: tauri::AppHandle) -> Result<Vec<Scene>, String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let mut scenes = Vec::new();
 
     let entries = fs::read_dir(&scenes_dir)
@@ -76,8 +127,8 @@ pub async fn get_scenes() -> Result<Vec<Scene>, String> {
 }
 
 #[tauri::command]
-pub async fn save_scene(scene_name: String) -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn save_scene(app: tauri::AppHandle, scene_name: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     
     // 获取当前网络配置
     use crate::network::get_network_info;
@@ -126,8 +177,8 @@ pub async fn save_scene(scene_name: String) -> Result<(), String> {
 
 /// 保存当前网络配置为备份（在应用场景前调用，只备份网卡IP配置）
 #[tauri::command]
-pub async fn save_backup() -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn save_backup(app: tauri::AppHandle) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     
     // 只获取当前网络配置（不涉及Hosts和代理）
     use crate::network::get_network_info;
@@ -165,8 +216,8 @@ pub async fn save_backup() -> Result<(), String> {
 
 /// 恢复备份配置（解除场景，只恢复网卡IP配置）
 #[tauri::command]
-pub async fn restore_backup() -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn restore_backup(app: tauri::AppHandle) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let backup_file = scenes_dir.join("_backup_before_scene.json");
     
     if !backup_file.exists() {
@@ -202,18 +253,18 @@ pub async fn restore_backup() -> Result<(), String> {
 
 /// 检查是否存在备份
 #[tauri::command]
-pub async fn has_backup() -> Result<bool, String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn has_backup(app: tauri::AppHandle) -> Result<bool, String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let backup_file = scenes_dir.join("_backup_before_scene.json");
     Ok(backup_file.exists())
 }
 
 #[tauri::command]
-pub async fn apply_scene(scene_name: String) -> Result<(), String> {
+pub async fn apply_scene(app: tauri::AppHandle, scene_name: String) -> Result<(), String> {
     // 在应用场景前，先保存当前配置为备份
-    save_backup().await?;
+    save_backup(app.clone()).await?;
     
-    let scenes_dir = ensure_scenes_dir()?;
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let scene_file = scenes_dir.join(format!("{}.json", scene_name));
     
     let content = fs::read_to_string(&scene_file)
@@ -254,13 +305,14 @@ pub async fn apply_scene(scene_name: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn update_scene(
+    app: tauri::AppHandle,
     scene_name: String,
     network_configs: HashMap<String, NetworkConfig>,
     hosts_content: Option<String>,
     proxy_config: Option<ProxyConfig>,
     tray_color: Option<String>,
 ) -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let scene_file = scenes_dir.join(format!("{}.json", scene_name));
     
     // 读取现有场景（如果存在）
@@ -308,8 +360,8 @@ pub async fn update_scene(
 }
 
 #[tauri::command]
-pub async fn delete_scene(scene_name: String) -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn delete_scene(app: tauri::AppHandle, scene_name: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let scene_file = scenes_dir.join(format!("{}.json", scene_name));
     
     fs::remove_file(&scene_file)
@@ -320,8 +372,8 @@ pub async fn delete_scene(scene_name: String) -> Result<(), String> {
 
 /// 导出所有场景到指定文件（JSON）
 #[tauri::command]
-pub async fn export_scenes(file_path: String) -> Result<(), String> {
-    let scenes = get_scenes().await?;
+pub async fn export_scenes(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    let scenes = get_scenes(app).await?;
     let content = serde_json::to_string_pretty(&scenes)
         .map_err(|e| format!("序列化场景列表失败: {}", e))?;
     fs::write(&file_path, content)
@@ -331,8 +383,8 @@ pub async fn export_scenes(file_path: String) -> Result<(), String> {
 
 /// 从指定文件导入场景列表（JSON），会覆盖同名场景
 #[tauri::command]
-pub async fn import_scenes(file_path: String) -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn import_scenes(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let content = fs::read_to_string(&file_path)
         .map_err(|e| format!("读取导入文件失败: {}", e))?;
     
@@ -352,8 +404,8 @@ pub async fn import_scenes(file_path: String) -> Result<(), String> {
 
 /// 以 JSON 字符串形式导出所有场景（给前端下载用）
 #[tauri::command]
-pub async fn export_scenes_json() -> Result<String, String> {
-    let scenes = get_scenes().await?;
+pub async fn export_scenes_json(app: tauri::AppHandle) -> Result<String, String> {
+    let scenes = get_scenes(app).await?;
     let content = serde_json::to_string_pretty(&scenes)
         .map_err(|e| format!("序列化场景列表失败: {}", e))?;
     Ok(content)
@@ -361,8 +413,8 @@ pub async fn export_scenes_json() -> Result<String, String> {
 
 /// 从 JSON 字符串导入场景列表（给前端上传用），会覆盖同名场景
 #[tauri::command]
-pub async fn import_scenes_json(json: String) -> Result<(), String> {
-    let scenes_dir = ensure_scenes_dir()?;
+pub async fn import_scenes_json(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let scenes_dir = ensure_scenes_dir(&app)?;
     let imported: Vec<Scene> = serde_json::from_str(&json)
         .map_err(|e| format!("解析导入数据失败: {}", e))?;
     
