@@ -154,7 +154,7 @@ pub fn is_elevated_check() -> bool {
     is_elevated()
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", debug_assertions))]
 pub fn restart_as_admin_internal() -> Result<(), String> {
     restart_as_admin()
 }

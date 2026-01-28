@@ -12,7 +12,7 @@ use hosts::*;
 use proxy::*;
 use scenes::*;
 use tray_icon::{TrayIconGenerator, update_tray_icon_color};
-use admin::{check_admin_privileges, request_admin_privileges, is_elevated_check, restart_as_admin_internal};
+use admin::{check_admin_privileges, request_admin_privileges, is_elevated_check};
 use tauri::{Manager, menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}};
 use std::fs;
 use std::path::PathBuf;
@@ -55,7 +55,7 @@ fn main() {
             // 开发模式下，尝试自动以管理员权限重启
             #[cfg(debug_assertions)]
             {
-                if let Err(e) = restart_as_admin_internal() {
+                if let Err(e) = admin::restart_as_admin_internal() {
                     eprintln!("自动请求管理员权限失败: {}", e);
                     show_admin_warning();
                 } else {
@@ -210,10 +210,10 @@ async fn set_dns_servers(adapter_name: String, dns: Vec<String>) -> Result<(), S
 
 /// 打开当前窗口的开发者工具（仅在调试/开发模式下有效）
 #[tauri::command]
-async fn open_devtools(window: tauri::WebviewWindow) {
+async fn open_devtools(_window: tauri::WebviewWindow) {
     #[cfg(debug_assertions)]
     {
-        window.open_devtools();
+        _window.open_devtools();
     }
 }
 

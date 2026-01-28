@@ -1,6 +1,27 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+use winapi::um::winbase::CREATE_NO_WINDOW;
+
+/// 创建 PowerShell 命令（Windows 下禁止弹出控制台窗口）
+fn powershell_cmd() -> Command {
+    let mut cmd = Command::new("powershell");
+
+    // 统一加上更“安静”的 PowerShell 参数，减少环境干扰
+    cmd.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]);
+
+    // Windows 下避免弹出/闪现 powershell 控制台窗口
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    cmd
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkAdapter {
     pub name: String,
@@ -20,7 +41,7 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
     let mut adapters = Vec::new();
 
     // 获取网络适配器信息 - 使用 UTF-8 编码
-    let output = Command::new("powershell")
+    let output = powershell_cmd()
         .args(&[
             "-Command",
             "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-NetAdapter | Select-Object Name, InterfaceDescription, Status, MacAddress | ConvertTo-Json -Depth 10"
@@ -143,7 +164,7 @@ fn get_all_ip_configs() -> Result<std::collections::HashMap<String, IpConfig>, S
     let mut configs = HashMap::new();
     
     // 一次性获取所有适配器的IP配置
-    let output = Command::new("powershell")
+    let output = powershell_cmd()
         .args(&[
             "-Command",
             "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $adapters = Get-NetAdapter; $result = @(); foreach ($adapter in $adapters) { $ip = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1; $route = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1; $interface = Get-NetIPInterface -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dns = Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dhcpValue = 0; if ($interface) { $dhcpValue = [int]$interface.Dhcp }; $obj = @{ Name = $adapter.Name; IP = if ($ip) { $ip.IPAddress } else { $null }; Prefix = if ($ip) { $ip.PrefixLength } else { $null }; Gateway = if ($route) { $route.NextHop } else { $null }; Dhcp = $dhcpValue; DNS = if ($dns -and $dns.ServerAddresses) { ($dns.ServerAddresses -join ',') } else { '' } }; $result += $obj }; $result | ConvertTo-Json -Depth 10"
@@ -252,7 +273,7 @@ fn get_all_ip_configs() -> Result<std::collections::HashMap<String, IpConfig>, S
 
 fn get_ip_config(adapter_name: &str) -> Result<IpConfig, String> {
     // 获取IP地址配置 - 使用更健壮的命令
-    let ip_output = match Command::new("powershell")
+    let ip_output = match powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -303,7 +324,7 @@ fn get_ip_config(adapter_name: &str) -> Result<IpConfig, String> {
     };
 
     // 获取网关
-    let gateway_output = Command::new("powershell")
+    let gateway_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -325,7 +346,7 @@ fn get_ip_config(adapter_name: &str) -> Result<IpConfig, String> {
         });
 
     // 检查是否为DHCP
-    let dhcp_output = Command::new("powershell")
+    let dhcp_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -342,7 +363,7 @@ fn get_ip_config(adapter_name: &str) -> Result<IpConfig, String> {
         .unwrap_or(false);
 
     // 获取DNS服务器
-    let dns_output = Command::new("powershell")
+    let dns_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -442,7 +463,7 @@ pub async fn set_static_ip(
     dns: Vec<String>,
 ) -> Result<(), String> {
     // 第一步：移除现有的默认网关路由（如果存在）
-    let _remove_gateway = Command::new("powershell")
+    let _remove_gateway = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -453,7 +474,7 @@ pub async fn set_static_ip(
         .output();
     
     // 第二步：移除现有IP配置（允许失败，因为可能没有现有IP）
-    let _remove_ip = Command::new("powershell")
+    let _remove_ip = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -469,7 +490,7 @@ pub async fn set_static_ip(
     // 第三步：设置静态IP（不包含DefaultGateway参数，先设置IP）
     let prefix = subnet_to_prefix(&subnet)?;
     
-    let set_ip_output = Command::new("powershell")
+    let set_ip_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -485,7 +506,7 @@ pub async fn set_static_ip(
     check_powershell_output(&set_ip_output, &format!("为网卡 {} 设置静态IP", adapter_name))?;
     
     // 第四步：单独设置默认网关
-    let set_gateway_output = Command::new("powershell")
+    let set_gateway_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -507,7 +528,7 @@ pub async fn set_static_ip(
     check_powershell_output(&set_gateway_output, &format!("为网卡 {} 设置网关", adapter_name))?;
 
     // 禁用DHCP
-    let disable_dhcp_output = Command::new("powershell")
+    let disable_dhcp_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -523,7 +544,7 @@ pub async fn set_static_ip(
     // 设置DNS
     if !dns.is_empty() {
         let dns_str = dns.join(",");
-        let set_dns_output = Command::new("powershell")
+        let set_dns_output = powershell_cmd()
             .args(&[
                 "-Command",
                 &format!(
@@ -544,7 +565,7 @@ pub async fn set_static_ip(
 #[tauri::command]
 pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
     // 移除现有IP配置（允许失败，因为可能没有现有IP）
-    let _ = Command::new("powershell")
+    let _ = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -555,7 +576,7 @@ pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
         .output();
 
     // 启用DHCP
-    let enable_dhcp_output = Command::new("powershell")
+    let enable_dhcp_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -569,7 +590,7 @@ pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
     check_powershell_output(&enable_dhcp_output, &format!("为网卡 {} 启用DHCP", adapter_name))?;
 
     // 清除DNS设置（使用DHCP提供的DNS，允许失败）
-    let _ = Command::new("powershell")
+    let _ = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -589,7 +610,7 @@ pub async fn set_dns_servers_internal(adapter_name: String, dns: Vec<String>) ->
     }
 
     let dns_str = dns.join(",");
-    let set_dns_output = Command::new("powershell")
+    let set_dns_output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -609,7 +630,7 @@ pub async fn set_dns_servers_internal(adapter_name: String, dns: Vec<String>) ->
 #[tauri::command]
 pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {
     // 使用PowerShell的Test-Connection命令进行ping测试
-    let output = Command::new("powershell")
+    let output = powershell_cmd()
         .args(&[
             "-Command",
             &format!(
@@ -703,7 +724,7 @@ async fn apply_network_config(adapter_name: &str, cfg: &NetworkConfig) -> Result
                 if let Some(dns) = &dhcp_cfg.dns {
                     if !dns.is_empty() {
                         let dns_str = dns.join(",");
-                        let _ = Command::new("powershell")
+                        let _ = powershell_cmd()
                             .args(&[
                                 "-Command",
                                 &format!(
