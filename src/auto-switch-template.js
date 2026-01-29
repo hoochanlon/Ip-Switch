@@ -62,45 +62,85 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
         <div class="form-group">
           <label>${t('network1Config')}:</label>
           <div class="form-group">
-            <label for="network1-mode">${t('mode')}:</label>
-            <select id="network1-mode" class="form-input">
-              <option value="dhcp" ${safeConfig.network1?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
-              <option value="static" ${safeConfig.network1?.mode === 'static' ? 'selected' : ''}>${t('staticIp')}</option>
-            </select>
+            <label class="radio-group-label">${t('mode')}</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="network1-mode" value="dhcp" id="network1-mode-dhcp" ${safeConfig.network1?.mode === 'dhcp' ? 'checked' : ''} onchange="window.toggleNetwork1Mode()">
+                <span>${t('dhcp')}</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="network1-mode" value="static" id="network1-mode-static" ${safeConfig.network1?.mode === 'static' ? 'checked' : ''} onchange="window.toggleNetwork1Mode()">
+                <span>${t('staticIp')}</span>
+              </label>
+            </div>
           </div>
           <div class="form-group" id="network1-dhcp-fields" style="display: ${safeConfig.network1?.mode === 'dhcp' ? 'block' : 'none'};">
-            <label for="network1-dhcp-dns">${t('dnsServersComma')}:</label>
-            <input type="text" id="network1-dhcp-dns" class="form-input" 
-                   value="${safeConfig.network1?.dhcp?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="network1-dhcp-dns"
+                class="form-input"
+                placeholder=" "
+                value="${safeConfig.network1?.dhcp?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
+              <label for="network1-dhcp-dns" class="form-label">${t('dnsServersLabelShort')}</label>
+            </div>
           </div>
           <div class="form-group" id="network1-static-fields" style="display: ${safeConfig.network1?.mode === 'static' ? 'block' : 'none'};">
             <div class="form-group">
-              <label for="network1-static-ip">${t('ipAddress')}</label>
-              <input type="text" id="network1-static-ip" class="form-input" 
-                     value="${safeConfig.network1?.staticConfig?.ip || ''}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network1-static-ip"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network1?.staticConfig?.ip || ''}">
+                <label for="network1-static-ip" class="form-label">${t('ipAddress')} (${t('ipExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network1-static-subnet">${t('subnetMask')}</label>
-              <input type="text" id="network1-static-subnet" class="form-input" 
-                     value="${safeConfig.network1?.staticConfig?.subnet || ''}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network1-static-subnet"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network1?.staticConfig?.subnet || ''}">
+                <label for="network1-static-subnet" class="form-label">${t('subnetMask')} (${t('subnetExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network1-static-gateway">${t('gateway')}</label>
-              <input type="text" id="network1-static-gateway" class="form-input" 
-                     value="${safeConfig.network1?.staticConfig?.gateway || ''}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network1-static-gateway"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network1?.staticConfig?.gateway || ''}">
+                <label for="network1-static-gateway" class="form-label">${t('gateway')} (${t('gatewayExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network1-static-dns">${t('dnsServersComma')}:</label>
-              <input type="text" id="network1-static-dns" class="form-input" 
-                     value="${safeConfig.network1?.staticConfig?.dns?.join(', ') || ''}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network1-static-dns"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network1?.staticConfig?.dns?.join(', ') || ''}">
+                <label for="network1-static-dns" class="form-label">${t('dnsServersLabelShort')}</label>
+              </div>
             </div>
           </div>
           <div class="form-group">
-            <label for="network1-ping">${t('pingTarget')}:</label>
-            <input type="text" id="network1-ping" class="form-input" 
-                   value="${safeConfig.network1?.pingTarget || 'baidu.com'}"
-                   placeholder="${t('pingTargetPlaceholder1')}">
-            <small class="form-hint">${t('pingHintToNetwork2')}</small>
+            <div class="form-floating">
+              <input
+                type="text"
+                id="network1-ping"
+                class="form-input" 
+                placeholder=" "
+                value="${safeConfig.network1?.pingTarget || 'baidu.com'}">
+              <label for="network1-ping" class="form-label">${t('pingTarget')} (${t('pingHintToNetwork2')})</label>
+            </div>
           </div>
           <div class="form-group">
             <label for="network1-tray-color">${t('trayColorNetwork1')}:</label>
@@ -119,45 +159,85 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
         <div class="form-group">
           <label>${t('network2Config')}:</label>
           <div class="form-group">
-            <label for="network2-mode">${t('mode')}:</label>
-            <select id="network2-mode" class="form-input">
-              <option value="dhcp" ${safeConfig.network2?.mode === 'dhcp' ? 'selected' : ''}>DHCP</option>
-              <option value="static" ${safeConfig.network2?.mode === 'static' ? 'selected' : ''}>${t('staticIp')}</option>
-            </select>
+            <label class="radio-group-label">${t('mode')}</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="network2-mode" value="dhcp" id="network2-mode-dhcp" ${safeConfig.network2?.mode === 'dhcp' ? 'checked' : ''} onchange="window.toggleNetwork2Mode()">
+                <span>${t('dhcp')}</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="network2-mode" value="static" id="network2-mode-static" ${safeConfig.network2?.mode === 'static' ? 'checked' : ''} onchange="window.toggleNetwork2Mode()">
+                <span>${t('staticIp')}</span>
+              </label>
+            </div>
           </div>
           <div class="form-group" id="network2-dhcp-fields" style="display: ${safeConfig.network2?.mode === 'dhcp' ? 'block' : 'none'};">
-            <label for="network2-dhcp-dns">${t('dnsServersComma')}:</label>
-            <input type="text" id="network2-dhcp-dns" class="form-input" 
-                   value="${safeConfig.network2?.dhcp?.dns?.join(', ') || ''}">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="network2-dhcp-dns"
+                class="form-input" 
+                placeholder=" "
+                value="${safeConfig.network2?.dhcp?.dns?.join(', ') || ''}">
+              <label for="network2-dhcp-dns" class="form-label">${t('dnsServersLabelShort')}</label>
+            </div>
           </div>
           <div class="form-group" id="network2-static-fields" style="display: ${safeConfig.network2?.mode === 'static' ? 'block' : 'none'};">
             <div class="form-group">
-              <label for="network2-static-ip">${t('ipAddress')}</label>
-              <input type="text" id="network2-static-ip" class="form-input" 
-                     value="${safeConfig.network2?.staticConfig?.ip || '172.16.1.55'}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network2-static-ip"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network2?.staticConfig?.ip || '172.16.1.55'}">
+                <label for="network2-static-ip" class="form-label">${t('ipAddress')} (${t('ipExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network2-static-subnet">${t('subnetMask')}</label>
-              <input type="text" id="network2-static-subnet" class="form-input" 
-                     value="${safeConfig.network2?.staticConfig?.subnet || '255.255.255.0'}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network2-static-subnet"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network2?.staticConfig?.subnet || '255.255.255.0'}">
+                <label for="network2-static-subnet" class="form-label">${t('subnetMask')} (${t('subnetExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network2-static-gateway">${t('gateway')}</label>
-              <input type="text" id="network2-static-gateway" class="form-input" 
-                     value="${safeConfig.network2?.staticConfig?.gateway || '172.16.1.254'}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network2-static-gateway"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network2?.staticConfig?.gateway || '172.16.1.254'}">
+                <label for="network2-static-gateway" class="form-label">${t('gateway')} (${t('gatewayExample')})</label>
+              </div>
             </div>
             <div class="form-group">
-              <label for="network2-static-dns">${t('dnsServersComma')}:</label>
-              <input type="text" id="network2-static-dns" class="form-input" 
-                     value="${safeConfig.network2?.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
+              <div class="form-floating">
+                <input
+                  type="text"
+                  id="network2-static-dns"
+                  class="form-input" 
+                  placeholder=" "
+                  value="${safeConfig.network2?.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
+                <label for="network2-static-dns" class="form-label">${t('dnsServersLabelShort')}</label>
+              </div>
             </div>
           </div>
           <div class="form-group">
-            <label for="network2-ping">${t('pingTarget')}:</label>
-            <input type="text" id="network2-ping" class="form-input" 
-                   value="${safeConfig.network2?.pingTarget || '172.16.1.254'}"
-                   placeholder="${t('pingTargetPlaceholder2')}">
-            <small class="form-hint">${t('pingHintToNetwork1')}</small>
+            <div class="form-floating">
+              <input
+                type="text"
+                id="network2-ping"
+                class="form-input" 
+                placeholder=" "
+                value="${safeConfig.network2?.pingTarget || '172.16.1.254'}">
+              <label for="network2-ping" class="form-label">${t('pingTarget')} (${t('pingHintToNetwork1')})</label>
+            </div>
           </div>
           <div class="form-group">
             <label for="network2-tray-color">${t('trayColorNetwork2')}:</label>

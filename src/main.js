@@ -91,6 +91,7 @@ function startNetworkInfoAutoRefresh() {
   if (networkInfoAutoRefreshTimer) clearInterval(networkInfoAutoRefreshTimer);
 
   const tick = () => {
+    if (state.isNetworkChanging) return;
     // 静默刷新：不打断用户操作，但如果网卡状态变化会 smart render
     refreshNetworkInfo(false, { skipRender: true, smartRender: true });
   };
@@ -116,6 +117,7 @@ function initNetworkStatus() {
   let pendingBackendRefresh = null;
 
   const maybeRefreshBackendNetworkInfo = async () => {
+    if (state.isNetworkChanging) return null;
     const now = Date.now();
     if (pendingBackendRefresh) return pendingBackendRefresh;
     if (now - lastBackendRefreshAt < 1000) return null;

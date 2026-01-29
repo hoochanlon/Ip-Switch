@@ -40,6 +40,54 @@
   max-width: 700px;
 }
 
+.auto-switch-modal {
+  max-width: 600px;
+  max-height: 85vh;
+}
+
+/* 自动切换弹窗内的表单组间距更紧凑 */
+.auto-switch-modal .form-group {
+  margin-bottom: 18px;
+}
+
+.auto-switch-modal .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* 自动切换弹窗内静态IP字段的间距更紧凑 */
+.auto-switch-modal #network1-static-fields .form-group,
+.auto-switch-modal #network2-static-fields .form-group {
+  margin-bottom: 14px;
+}
+
+.auto-switch-modal #network1-static-fields .form-group:last-child,
+.auto-switch-modal #network2-static-fields .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* 自动切换弹窗的 body 内边距更紧凑 */
+.auto-switch-modal .modal-body {
+  padding: 16px 20px;
+}
+
+/* 自动切换弹窗的 header 和 footer 内边距更紧凑 */
+.auto-switch-modal .modal-header {
+  padding: 16px 20px;
+}
+
+.auto-switch-modal .modal-footer {
+  padding: 16px 20px;
+}
+
+/* 自动切换弹窗内的 radio-group 更紧凑 */
+.auto-switch-modal .radio-group {
+  padding: 12px 15px;
+}
+
+.auto-switch-modal .radio-group-label {
+  margin-bottom: 6px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -155,6 +203,61 @@
   font-size: 14px;
 }
 
+/* 浮动标签输入框容器 */
+.form-floating {
+  position: relative;
+  width: 100%;
+}
+
+.form-floating .form-input {
+  width: 100%;
+  padding: 0.8em;
+  font-family: inherit;
+  font-size: inherit;
+  border: 2px solid var(--border-color);
+  border-radius: 0.5rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-floating .form-input:hover {
+  border-color: var(--btn-primary-bg);
+  opacity: 0.8;
+}
+
+.form-floating .form-input:focus {
+  border-color: var(--btn-primary-bg);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-floating .form-label {
+  color: var(--text-tertiary);
+  position: absolute;
+  top: 0.8em;
+  left: 1em;
+  cursor: text;
+  transition: top 200ms ease-in, font-size 200ms ease-in;
+  user-select: none;
+  background-color: var(--bg-secondary);
+  padding: 0 0.5em;
+  pointer-events: none;
+}
+
+.form-floating .form-input:focus ~ .form-label,
+.form-floating .form-input:not(:placeholder-shown) ~ .form-label {
+  top: -0.5em;
+  font-size: 0.8em;
+  color: var(--btn-primary-bg);
+}
+
+/* 当输入框有值时，标签应该浮动 */
+.form-floating .form-input:not(:placeholder-shown) ~ .form-label {
+  top: -0.5em;
+  font-size: 0.8em;
+}
+
 /* 颜色选择器容器 */
 .color-picker-container {
   display: flex;
@@ -210,6 +313,12 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+/* 浮动标签输入框中的input样式覆盖 */
+.form-floating .form-input {
+  padding: 0.8em;
+  border-radius: 0.5rem;
+}
+
 .form-textarea {
   width: 100%;
   padding: 10px 12px;
@@ -262,6 +371,14 @@
   vertical-align: middle;
 }
 
+/* 代理编辑器：复选框横向排列 */
+.proxy-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: center;
+}
+
 /* 单选按钮组 */
 .radio-group-label {
   display: block;
@@ -272,8 +389,9 @@
 
 .radio-group {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 24px;
   padding: 15px;
   background: var(--bg-tertiary);
   border-radius: 8px;

@@ -313,6 +313,15 @@ async function performAutoSwitch(force = false) {
 
   autoSwitchInFlight = true;
   
+  // 暂停网络状态检测，避免网络配置切换时产生 ERR_NETWORK_CHANGED 错误
+  if (state.networkStatus && typeof state.networkStatus.pause === 'function') {
+    state.networkStatus.pause();
+  }
+  // 同时标记“网络切换中”，让 main.js 的后台轮询/刷新也暂停，减少 Tauri 回调丢失噪声
+  if (typeof state.setIsNetworkChanging === 'function') {
+    state.setIsNetworkChanging(true);
+  }
+  
   const network1Defaults = {
     mode: 'dhcp',
     dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
@@ -400,9 +409,36 @@ async function performAutoSwitch(force = false) {
     // 刷新网络信息（只更新数据，不强制重绘，避免正在查看的网卡列表闪烁）
     await refreshNetworkInfo(false, { skipRender: true });
   } catch (error) {
-    console.error('自动切换失败:', error);
+    const msg = String(error || '');
+
+    // 已知场景：PowerShell New-NetIPAddress 报 "Instance MSFT_NetIPAddress already exists"
+    // 含义：系统认为该网卡上已经有一条相同的静态 IP，重复设置会触发这个异常。
+    if (msg.includes('MSFT_NetIPAddress already exists')) {
+      console.warn(
+        '[auto-switch] 自动切换时设置静态 IP 被系统拒绝：当前静态 IP 已存在，通常可以忽略此错误。',
+        {
+          adapter: autoSwitchConfig?.adapterName,
+          message: msg,
+        },
+      );
+    } else if (msg.includes('Access is denied') || msg.includes('权限不足')) {
+      console.error('[auto-switch] 自动切换失败：权限不足，请以管理员身份运行应用。', {
+        message: msg,
+      });
+    } else {
+      console.error('[auto-switch] 自动切换失败（未知错误）：', error);
+    }
   } finally {
     autoSwitchInFlight = false;
+    // 恢复网络状态检测，延迟一点时间确保网络配置已稳定
+    if (state.networkStatus && typeof state.networkStatus.resume === 'function') {
+      setTimeout(() => {
+        state.networkStatus.resume();
+      }, 2000); // 延迟2秒恢复检测，给网络配置切换留出时间
+    }
+    if (typeof state.setIsNetworkChanging === 'function') {
+      setTimeout(() => state.setIsNetworkChanging(false), 2000);
+    }
   }
 }
 
@@ -449,6 +485,14 @@ async function toggleByDhcpStatusOnPlug() {
 
   const dhcpCfg = dhcpSide === 'network1' ? network1Config : network2Config;
   const staticCfg = staticSide === 'network1' ? network1Config : network2Config;
+
+  // 暂停网络状态检测，避免网络配置切换时产生 ERR_NETWORK_CHANGED 错误
+  if (state.networkStatus && typeof state.networkStatus.pause === 'function') {
+    state.networkStatus.pause();
+  }
+  if (typeof state.setIsNetworkChanging === 'function') {
+    state.setIsNetworkChanging(true);
+  }
 
   try {
     if (adapterSnap.is_dhcp) {
@@ -512,7 +556,33 @@ async function toggleByDhcpStatusOnPlug() {
     // 切完后刷新一次网卡信息
     await refreshNetworkInfo(false, { skipRender: true });
   } catch (error) {
-    console.error('自动切换（拔插网线）执行失败:', error);
+    const msg = String(error || '');
+    if (msg.includes('MSFT_NetIPAddress already exists')) {
+      console.warn(
+        '[auto-switch] 拔插网线触发的自动切换在设置静态 IP 时被系统拒绝：当前静态 IP 已存在，通常可以忽略此错误。',
+        {
+          adapter: adapterName,
+          message: msg,
+        },
+      );
+    } else if (msg.includes('Access is denied') || msg.includes('权限不足')) {
+      console.error('[auto-switch] 拔插网线自动切换失败：权限不足，请以管理员身份运行应用。', {
+        adapter: adapterName,
+        message: msg,
+      });
+    } else {
+      console.error('自动切换（拔插网线）执行失败:', error);
+    }
+  } finally {
+    // 恢复网络状态检测，延迟一点时间确保网络配置已稳定
+    if (state.networkStatus && typeof state.networkStatus.resume === 'function') {
+      setTimeout(() => {
+        state.networkStatus.resume();
+      }, 2000); // 延迟2秒恢复检测，给网络配置切换留出时间
+    }
+    if (typeof state.setIsNetworkChanging === 'function') {
+      setTimeout(() => state.setIsNetworkChanging(false), 2000);
+    }
   }
 }
 
@@ -740,24 +810,34 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
     document.getElementById('auto-switch-adapter').value = currentConfig.adapterName;
   }
 
-  // 绑定模式切换显示
-  const bindModeToggle = (modeId, staticId, dhcpId) => {
-    const modeSelect = document.getElementById(modeId);
-    const staticFields = document.getElementById(staticId);
-    const dhcpFields = document.getElementById(dhcpId);
-    if (!modeSelect) return;
-    const toggle = () => {
-      const isStatic = modeSelect.value === 'static';
-      if (staticFields) staticFields.style.display = isStatic ? 'block' : 'none';
-      if (dhcpFields) dhcpFields.style.display = isStatic ? 'none' : 'block';
-    };
-    modeSelect.addEventListener('change', toggle);
-    toggle();
-  };
-
-  bindModeToggle('network1-mode', 'network1-static-fields', 'network1-dhcp-fields');
-  bindModeToggle('network2-mode', 'network2-static-fields', 'network2-dhcp-fields');
+  // 初始化模式切换显示状态
+  window.toggleNetwork1Mode();
+  window.toggleNetwork2Mode();
 }
+
+// 切换网络1模式显示
+window.toggleNetwork1Mode = function() {
+  const staticRadio = document.getElementById('network1-mode-static');
+  const staticFields = document.getElementById('network1-static-fields');
+  const dhcpFields = document.getElementById('network1-dhcp-fields');
+  if (staticRadio) {
+    const isStatic = staticRadio.checked;
+    if (staticFields) staticFields.style.display = isStatic ? 'block' : 'none';
+    if (dhcpFields) dhcpFields.style.display = isStatic ? 'none' : 'block';
+  }
+};
+
+// 切换网络2模式显示
+window.toggleNetwork2Mode = function() {
+  const staticRadio = document.getElementById('network2-mode-static');
+  const staticFields = document.getElementById('network2-static-fields');
+  const dhcpFields = document.getElementById('network2-dhcp-fields');
+  if (staticRadio) {
+    const isStatic = staticRadio.checked;
+    if (staticFields) staticFields.style.display = isStatic ? 'block' : 'none';
+    if (dhcpFields) dhcpFields.style.display = isStatic ? 'none' : 'block';
+  }
+};
 
 // 取消自动切换配置
 window.cancelAutoSwitchConfig = function(fromCheckbox, checkboxStateBeforeOpen) {
@@ -791,7 +871,9 @@ window.saveAutoSwitchConfig = function() {
   const enabled = document.getElementById('auto-switch-enabled').checked;
   const adapterName = document.getElementById('auto-switch-adapter').value;
   
-  const network1Mode = document.getElementById('network1-mode').value;
+  // 从 radio button 获取模式
+  const network1ModeRadio = document.querySelector('input[name="network1-mode"]:checked');
+  const network1Mode = network1ModeRadio ? network1ModeRadio.value : 'dhcp';
   const network1DhcpDns = document.getElementById('network1-dhcp-dns').value.trim();
   const network1StaticIp = document.getElementById('network1-static-ip').value.trim();
   const network1StaticSubnet = document.getElementById('network1-static-subnet').value.trim();
@@ -802,7 +884,9 @@ window.saveAutoSwitchConfig = function() {
   const network1TrayColor = network1TrayColorInput ? network1TrayColorInput.value.trim() : '';
   const validNetwork1TrayColor = network1TrayColor && /^#[0-9A-Fa-f]{6}$/.test(network1TrayColor) ? network1TrayColor : '#00FF00';
 
-  const network2Mode = document.getElementById('network2-mode').value;
+  // 从 radio button 获取模式
+  const network2ModeRadio = document.querySelector('input[name="network2-mode"]:checked');
+  const network2Mode = network2ModeRadio ? network2ModeRadio.value : 'static';
   const network2DhcpDns = document.getElementById('network2-dhcp-dns').value.trim();
   const network2StaticIp = document.getElementById('network2-static-ip').value.trim();
   const network2StaticSubnet = document.getElementById('network2-static-subnet').value.trim();

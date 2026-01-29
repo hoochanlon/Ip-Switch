@@ -623,39 +623,43 @@ function showNetworkConfigEditor(adapter) {
         
         <div id="static-ip-fields" style="display: ${adapter.is_dhcp ? 'none' : 'block'};">
           <div class="form-group">
-            <label for="ip-address">${t('ipAddress')}</label>
-            <input type="text" id="ip-address" class="form-input" 
-                   placeholder="192.168.1.100" 
-                   value="${adapter.ip_address || ''}"
-                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">${t('ipExample')}</small>
+            <div class="form-floating">
+              <input type="text" id="ip-address" class="form-input" 
+                     placeholder=" " 
+                     value="${adapter.ip_address || ''}"
+                     pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+              <label for="ip-address" class="form-label">${t('ipAddress')} (${t('ipExample')})</label>
+            </div>
           </div>
           
           <div class="form-group">
-            <label for="subnet-mask">${t('subnetMask')}</label>
-            <input type="text" id="subnet-mask" class="form-input" 
-                   placeholder="255.255.255.0" 
-                   value="${adapter.subnet_mask || ''}"
-                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">${t('subnetExample')}</small>
+            <div class="form-floating">
+              <input type="text" id="subnet-mask" class="form-input" 
+                     placeholder=" " 
+                     value="${adapter.subnet_mask || ''}"
+                     pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+              <label for="subnet-mask" class="form-label">${t('subnetMask')} (${t('subnetExample')})</label>
+            </div>
           </div>
           
           <div class="form-group">
-            <label for="gateway">${t('gateway')}</label>
-            <input type="text" id="gateway" class="form-input" 
-                   placeholder="192.168.1.1" 
-                   value="${adapter.gateway || ''}"
-                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
-            <small class="form-hint">${t('gatewayExample')}</small>
+            <div class="form-floating">
+              <input type="text" id="gateway" class="form-input" 
+                     placeholder=" " 
+                     value="${adapter.gateway || ''}"
+                     pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$">
+              <label for="gateway" class="form-label">${t('gateway')} (${t('gatewayExample')})</label>
+            </div>
           </div>
         </div>
         
         <div class="form-group">
-          <label for="dns-servers">${t('dnsServers')}</label>
-          <input type="text" id="dns-servers" class="form-input" 
-                 placeholder="8.8.8.8,8.8.4.4" 
-                 value="${adapter.dns_servers?.join(', ') || ''}">
-          <small class="form-hint">${t('dnsServersHint')}</small>
+          <div class="form-floating">
+            <input type="text" id="dns-servers" class="form-input" 
+                   placeholder=" " 
+                   value="${adapter.dns_servers?.join(', ') || ''}">
+            <label for="dns-servers" class="form-label">${t('dnsServersLabelShort')}</label>
+          </div>
         </div>
       </div>
       <div class="modal-footer">

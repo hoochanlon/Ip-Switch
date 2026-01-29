@@ -8,6 +8,7 @@ export let networkStatus = null;
 export let lastTrayColor = null; // 保存上次的托盘颜色，用于网络恢复时恢复
 export let selectedNetworkAdapters = null; // Set<string> | null（null 表示全选/不做勾选过滤）
 export let selectedNetworkAdaptersInitialized = false; // 是否已经做过“默认初始化”
+export let isNetworkChanging = false; // 网络配置切换中（用于暂停前端探测/后台轮询，减少噪声日志）
 
 // 设置网络信息
 export function setCurrentNetworkInfo(info) {
@@ -86,6 +87,10 @@ export function setCurrentScene(sceneName) {
 // 设置网络状态检测器
 export function setNetworkStatus(status) {
   networkStatus = status;
+}
+
+export function setIsNetworkChanging(value) {
+  isNetworkChanging = !!value;
 }
 
 // 设置最后使用的托盘颜色

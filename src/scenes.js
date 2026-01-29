@@ -149,6 +149,7 @@ function showSceneEditor(existingScene = null) {
     const typeInfo = getNetworkTypeInfo(adapter.network_type || (adapter.is_wireless ? 'wifi' : 'ethernet'));
     const existingConfig = existingScene?.network_configs?.[adapter.name];
     const isSelected = !!existingConfig;
+    const safeId = adapter.name.replace(/[^a-zA-Z0-9_-]/g, '_');
     
     return {
       adapter,
@@ -160,12 +161,13 @@ function showSceneEditor(existingScene = null) {
         gateway: adapter.gateway,
         dns: adapter.dns_servers
       },
-      isSelected
+      isSelected,
+      safeId
     };
   });
   
   const sceneName = existingScene ? existingScene.name : '';
-  const adapterListHtml = adapterConfigs.map(({ adapter, typeInfo, config, isSelected }) => `
+  const adapterListHtml = adapterConfigs.map(({ adapter, typeInfo, config, isSelected, safeId }) => `
     <div class="scene-adapter-config" data-adapter="${adapter.name}">
       <div class="scene-adapter-header">
         <label class="checkbox-label">
@@ -179,39 +181,69 @@ function showSceneEditor(existingScene = null) {
       </div>
       <div class="scene-adapter-fields" style="display: ${isSelected ? 'block' : 'none'};">
         <div class="form-group">
-          <label class="radio-label">
-            <input type="radio" name="ip-type-${adapter.name}" value="dhcp" 
-                   ${config.is_dhcp ? 'checked' : ''} 
-                   onchange="window.updateAdapterConfigType('${adapter.name}', true)">
-            <span>${t('dhcp')}</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="ip-type-${adapter.name}" value="static" 
-                   ${!config.is_dhcp ? 'checked' : ''} 
-                   onchange="window.updateAdapterConfigType('${adapter.name}', false)">
-            <span>${t('staticIp')}</span>
-          </label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="ip-type-${adapter.name}" value="dhcp" 
+                     ${config.is_dhcp ? 'checked' : ''} 
+                     onchange="window.updateAdapterConfigType('${adapter.name}', true)">
+              <span>${t('dhcp')}</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="ip-type-${adapter.name}" value="static" 
+                     ${!config.is_dhcp ? 'checked' : ''} 
+                     onchange="window.updateAdapterConfigType('${adapter.name}', false)">
+              <span>${t('staticIp')}</span>
+            </label>
+          </div>
         </div>
         <div class="static-ip-config" style="display: ${config.is_dhcp ? 'none' : 'block'};">
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="${t('ipAddressLabel')}" 
-                   value="${config.ip || ''}" 
-                   onchange="window.updateAdapterConfig('${adapter.name}', 'ip', this.value)">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="scene-ip-${safeId}"
+                class="form-input"
+                placeholder=" "
+                value="${config.ip || ''}"
+                onchange="window.updateAdapterConfig('${adapter.name}', 'ip', this.value)">
+              <label for="scene-ip-${safeId}" class="form-label">${t('ipAddress')} (${t('ipExample')})</label>
+            </div>
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="${t('subnetMaskLabel')}" 
-                   value="${config.subnet || ''}" 
-                   onchange="window.updateAdapterConfig('${adapter.name}', 'subnet', this.value)">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="scene-subnet-${safeId}"
+                class="form-input"
+                placeholder=" "
+                value="${config.subnet || ''}"
+                onchange="window.updateAdapterConfig('${adapter.name}', 'subnet', this.value)">
+              <label for="scene-subnet-${safeId}" class="form-label">${t('subnetMask')} (${t('subnetExample')})</label>
+            </div>
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="${t('gatewayLabel')}" 
-                   value="${config.gateway || ''}" 
-                   onchange="window.updateAdapterConfig('${adapter.name}', 'gateway', this.value)">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="scene-gateway-${safeId}"
+                class="form-input"
+                placeholder=" "
+                value="${config.gateway || ''}"
+                onchange="window.updateAdapterConfig('${adapter.name}', 'gateway', this.value)">
+              <label for="scene-gateway-${safeId}" class="form-label">${t('gateway')} (${t('gatewayExample')})</label>
+            </div>
           </div>
           <div class="form-group">
-            <input type="text" class="form-input" placeholder="${t('dnsServersComma')}" 
-                   value="${config.dns?.join(', ') || ''}" 
-                   onchange="window.updateAdapterConfig('${adapter.name}', 'dns', this.value)">
+            <div class="form-floating">
+              <input
+                type="text"
+                id="scene-dns-${safeId}"
+                class="form-input"
+                placeholder=" "
+                value="${config.dns?.join(', ') || ''}"
+                onchange="window.updateAdapterConfig('${adapter.name}', 'dns', this.value)">
+              <label for="scene-dns-${safeId}" class="form-label">${t('dnsServersLabelShort')}</label>
+            </div>
           </div>
         </div>
       </div>

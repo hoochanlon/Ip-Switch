@@ -24,7 +24,7 @@ function showProxyEditor(proxy) {
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
+        <div class="form-group proxy-checkbox-group">
           <label class="checkbox-label">
             <input type="checkbox" id="proxy-enabled" ${proxy.enabled ? 'checked' : ''}>
             <span>${t('proxyEnabled')}</span>
