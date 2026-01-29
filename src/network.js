@@ -375,6 +375,11 @@ function renderFullMode(container) {
     
     const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
     const status = adapter.is_enabled ? t('connected') : t('disconnected');
+    const toggleLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
+    const toggleAction = adapter.is_enabled ? 'disable' : 'enable';
+    const toggleBtnClass = adapter.is_enabled
+      ? 'btn btn-danger adapter-toggle-btn'
+      : 'btn btn-success adapter-toggle-btn';
     
     card.innerHTML = `
       <div class="network-header">
@@ -429,7 +434,14 @@ function renderFullMode(container) {
           <span class="value value-bytes-sent">${formatBytes(adapter.bytes_sent)}</span>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
+      <div class="network-card-actions" style="display:flex; gap:10px; margin-top: 10px; justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
+        <button
+          class="${toggleBtnClass}"
+          data-action="${toggleAction}"
+          onclick="window.toggleNetworkAdapter('${adapter.name}', this)"
+        >${toggleLabel}</button>
+      </div>
     `;
     
     container.appendChild(card);
@@ -496,8 +508,61 @@ export function updateNetworkInfoStatsView() {
     setText('.value-speed', adapter.link_speed || t('unknown'));
     setText('.value-bytes-received', formatBytes(adapter.bytes_received));
     setText('.value-bytes-sent', formatBytes(adapter.bytes_sent));
+
+    // 启用/禁用按钮（就地更新，避免整体重绘）
+    const toggleBtn = card.querySelector('.adapter-toggle-btn');
+    if (toggleBtn) {
+      const nextAction = adapter.is_enabled ? 'disable' : 'enable';
+      const nextLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
+      const nextClass =
+        adapter.is_enabled ? 'btn btn-danger adapter-toggle-btn' : 'btn btn-success adapter-toggle-btn';
+      toggleBtn.setAttribute('data-action', nextAction);
+      toggleBtn.textContent = nextLabel;
+      toggleBtn.className = nextClass;
+    }
   });
 }
+
+// 启用/禁用网卡
+// 说明：Windows 需要管理员权限，否则后端会返回权限错误
+window.toggleNetworkAdapter = async function(adapterName, buttonEl) {
+  if (!adapterName) return;
+  const action = buttonEl?.getAttribute?.('data-action');
+  if (action !== 'disable' && action !== 'enable') return;
+
+  // 避免重复点击
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  try {
+    if (action === 'disable') {
+      await invoke('disable_adapter', { adapterName });
+      alert(t('adapterDisabled'));
+    } else {
+      await invoke('enable_adapter', { adapterName });
+      alert(t('adapterEnabled'));
+    }
+  } catch (error) {
+    const raw = String(error || '');
+    console.error('切换网卡启用状态失败:', raw);
+    const short = raw.split('\n')[0] || raw;
+    if (action === 'disable') {
+      alert(t('disableAdapterFailed', { error: short }));
+    } else {
+      alert(t('enableAdapterFailed', { error: short }));
+    }
+  } finally {
+    // 静默刷新网络信息，不阻塞界面
+    refreshNetworkInfo(false, { smartRender: true }).catch((err) => {
+      console.error('刷新网络信息失败:', err);
+    });
+
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+  }
+};
 
 // 编辑网络配置 - 使用表单界面
 window.editNetworkConfig = async function(adapterName) {

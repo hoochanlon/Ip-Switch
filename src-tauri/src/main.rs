@@ -169,6 +169,8 @@ fn main() {
             network::get_network_info,
             network::set_static_ip,
             network::set_dhcp,
+            network::disable_adapter,
+            network::enable_adapter,
             set_dns_servers,
             get_hosts,
             set_hosts,

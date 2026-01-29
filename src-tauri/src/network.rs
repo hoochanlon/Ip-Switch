@@ -1085,3 +1085,41 @@ fn subnet_to_prefix(subnet: &str) -> Result<u8, String> {
 
     Ok(prefix)
 }
+
+/// 禁用网络适配器
+#[tauri::command]
+pub async fn disable_adapter(adapter_name: String) -> Result<(), String> {
+    let disable_output = powershell_cmd()
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Disable-NetAdapter -Name '{}' -Confirm:$false -ErrorAction Stop",
+                adapter_name.replace("'", "''"),
+                adapter_name.replace("'", "''")
+            )
+        ])
+        .output()
+        .map_err(|e| format!("执行禁用网卡命令失败: {}", e))?;
+    
+    check_powershell_output(&disable_output, &format!("禁用网卡 {}", adapter_name))?;
+    Ok(())
+}
+
+/// 启用网络适配器
+#[tauri::command]
+pub async fn enable_adapter(adapter_name: String) -> Result<(), String> {
+    let enable_output = powershell_cmd()
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction Stop; Enable-NetAdapter -Name '{}' -Confirm:$false -ErrorAction Stop",
+                adapter_name.replace("'", "''"),
+                adapter_name.replace("'", "''")
+            )
+        ])
+        .output()
+        .map_err(|e| format!("执行启用网卡命令失败: {}", e))?;
+    
+    check_powershell_output(&enable_output, &format!("启用网卡 {}", adapter_name))?;
+    Ok(())
+}

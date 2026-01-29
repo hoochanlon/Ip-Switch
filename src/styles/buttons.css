@@ -29,6 +29,24 @@
   background: var(--btn-secondary-hover);
 }
 
+.btn-success {
+  background: #16a34a; /* 绿色 */
+  color: #ffffff;
+}
+
+.btn-success:hover {
+  background: #15803d;
+}
+
+.btn-danger {
+  background: #dc2626; /* 红色 */
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
 .btn-ghost {
   background: var(--btn-ghost-bg);
   color: var(--text-primary);

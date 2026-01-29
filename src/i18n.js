@@ -96,6 +96,12 @@ const DICT = {
 
     // 网络配置
     configureNetwork: '配置网络',
+    disableAdapter: '禁用',
+    enableAdapter: '启用',
+    adapterDisabled: '网卡已禁用',
+    adapterEnabled: '网卡已启用',
+    disableAdapterFailed: '禁用网卡失败: {error}',
+    enableAdapterFailed: '启用网卡失败: {error}',
     networkConfigTitle: '配置网络: {name}',
     ipConfigType: 'IP配置类型:',
     dhcp: '动态IP (DHCP)',
@@ -270,6 +276,12 @@ const DICT = {
 
     // Network config
     configureNetwork: 'Configure',
+    disableAdapter: 'Disable',
+    enableAdapter: 'Enable',
+    adapterDisabled: 'Adapter disabled',
+    adapterEnabled: 'Adapter enabled',
+    disableAdapterFailed: 'Failed to disable adapter: {error}',
+    enableAdapterFailed: 'Failed to enable adapter: {error}',
     networkConfigTitle: 'Configure network: {name}',
     ipConfigType: 'IP mode:',
     dhcp: 'DHCP',
