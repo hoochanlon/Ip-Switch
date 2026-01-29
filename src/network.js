@@ -97,6 +97,18 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
       
       state.setCurrentNetworkInfo(networkInfo);
       
+      // 检查并修复筛选状态：如果筛选状态不为 null，但新加载的网卡都不匹配，重置为全选
+      if (state.selectedNetworkAdapters !== null && networkInfo && networkInfo.length > 0) {
+        const hasMatch = networkInfo.some(adapter => 
+          state.selectedNetworkAdapters.has(adapter.name)
+        );
+        if (!hasMatch) {
+          console.warn('刷新后筛选状态不匹配新网卡，重置为全选。筛选状态:', Array.from(state.selectedNetworkAdapters));
+          console.warn('新网卡列表:', networkInfo.map(a => a.name));
+          state.setSelectedNetworkAdapters(null);
+        }
+      }
+      
       if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
         // 只在显示加载提示或容器为空时才显示错误信息
         if (container && (showLoading || container.innerHTML.trim() === '')) {
@@ -302,10 +314,35 @@ export function startFastMediaStateWatcher() {
 
 // 渲染网络信息
 export function renderNetworkInfo() {
-  if (!state.currentNetworkInfo) return;
+  console.log('renderNetworkInfo 被调用，currentNetworkInfo:', state.currentNetworkInfo?.length || 0);
+  
+  if (!state.currentNetworkInfo) {
+    console.warn('renderNetworkInfo: currentNetworkInfo 为空');
+    return;
+  }
 
   const container = document.getElementById('network-info');
+  if (!container) {
+    console.error('renderNetworkInfo: 找不到 network-info 容器');
+    return;
+  }
+
+  // 检查筛选状态是否有效：如果筛选状态不为 null，但没有任何网卡匹配，说明筛选状态过期了
+  console.log('当前筛选状态:', state.selectedNetworkAdapters === null ? 'null (全选)' : Array.from(state.selectedNetworkAdapters));
+  if (state.selectedNetworkAdapters !== null && state.currentNetworkInfo.length > 0) {
+    const hasMatch = state.currentNetworkInfo.some(adapter => 
+      state.selectedNetworkAdapters.has(adapter.name)
+    );
+    console.log('筛选匹配检查:', hasMatch ? '有匹配' : '无匹配');
+    if (!hasMatch) {
+      console.warn('筛选状态过期，重置为全选。当前筛选状态:', Array.from(state.selectedNetworkAdapters));
+      console.warn('当前网卡列表:', state.currentNetworkInfo.map(a => a.name));
+      state.setSelectedNetworkAdapters(null);
+    }
+  }
+
   container.innerHTML = '';
+  console.log('容器已清空，准备调用 renderFullMode');
 
   // 让网络卡片列表区域单独可滚动（标题/筛选栏固定）
   const networkSection = container.closest('.network-section');
@@ -320,6 +357,7 @@ export function renderNetworkInfo() {
   }
 
   renderFullMode(container);
+  console.log('renderFullMode 完成，容器子元素数量:', container.children.length);
 }
 
 // 初始化网络筛选功能
@@ -554,9 +592,12 @@ function renderFullMode(container) {
   
   // 如果没有匹配的结果
   if (filteredAdapters.length === 0) {
+    console.warn('筛选后没有匹配的网卡，显示"无匹配"提示');
     container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('noMatchingAdapters')}</div>`;
     return;
   }
+  
+  console.log('筛选后网卡数:', filteredAdapters.length, '准备渲染网卡卡片');
   
   // 按类型分组：WiFi 优先显示
   const sortedAdapters = filteredAdapters.sort((a, b) => {
