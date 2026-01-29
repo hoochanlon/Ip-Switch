@@ -100,7 +100,17 @@ setx PATH "%PATH%;C:\Program Files (x86)\NSIS"
 makensis ip-switch.nsi
 ```
 
+## Traffic
 
+技术术语对照
+
+* 上行 / 发送：Upload / Uplink / Outbound / Tx (Transmit)
+* 下行 / 接收：Download / Downlink / Inbound / Rx (Receive)
+
+直白解释
+
+上行（发送）：你的设备发出去的数据，比如上传文件、发消息、视频通话中你的画面和声音。
+下行（接收）：从网络、服务器、其他设备等接收到的数据，比如看视频、加载网页、收文件。
 
 ## Proxy
 

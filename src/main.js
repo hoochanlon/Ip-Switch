@@ -192,11 +192,53 @@ export async function checkNetworkStatusWithBackend() {
     const isOnline = frontendStatus && hasEnabledAdapter;
     
     // 检查以太网和WiFi是否都断开
-    const allMainAdaptersDisconnected = !hasEnabledEthernet && !hasEnabledWifi;
+    // 不仅要检查 is_enabled，还要检查是否有实际连接（有IP地址）
+    let hasConnectedEthernet = false;
+    let hasConnectedWifi = false;
+    
+    if (state.currentNetworkInfo) {
+      for (const adapter of state.currentNetworkInfo) {
+        const name = adapter.name.toLowerCase();
+        const networkType = (adapter.network_type || '').toLowerCase();
+        
+        // 排除虚拟网卡和蓝牙
+        const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+        const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
+        const isBluetooth = networkType === 'bluetooth' || name.includes('bluetooth');
+        
+        if (isVirtual || isBluetooth) {
+          continue;
+        }
+        
+        // 检查以太网
+        const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
+          name.includes('ethernet') || 
+          name.includes('以太网') ||
+          (name.includes('lan') && !isVirtual && !name.includes('wlan'))
+        ));
+        
+        // 检查WiFi
+        const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
+        
+        // 检查是否有实际连接（启用且有IP地址）
+        const hasConnection = adapter.is_enabled && adapter.ip_address;
+        
+        if (isEthernet && hasConnection) {
+          hasConnectedEthernet = true;
+        }
+        if (isWifi && hasConnection) {
+          hasConnectedWifi = true;
+        }
+      }
+    }
+    
+    // 检查以太网和WiFi是否都断开（没有实际连接）
+    const allMainAdaptersDisconnected = !hasConnectedEthernet && !hasConnectedWifi;
     
     // 更新托盘图标颜色
-    if (allMainAdaptersDisconnected) {
-      // 以太网和WiFi都断开，设置为红色
+    // 如果前端检测为在线，或者有实际连接的网卡，就不显示红色
+    if (allMainAdaptersDisconnected && !frontendStatus) {
+      // 以太网和WiFi都断开，且前端检测也为离线，设置为红色
       try {
         await invoke('update_tray_icon_color', { hexColor: '#FF0000' });
       } catch (error) {
