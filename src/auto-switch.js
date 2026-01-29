@@ -16,6 +16,10 @@ let autoSwitchLocked = false;
 let ethernetStatusDebounceTimer = null;
 let pendingEthernetStatus = null;
 
+// 记录启用自动切换前，该网卡原始的 IP/DHCP 配置，用于关闭自动切换时还原
+// 结构示例：{ adapterName, isDhcp, ip, subnet, gateway, dns }
+const AUTO_SWITCH_ORIGINAL_KEY = 'autoSwitchOriginalConfig';
+
 async function pingWithRetries(host, timeoutSec = 2, attempts = 2, delayMs = 400) {
   const tries = Math.max(1, attempts);
   for (let i = 0; i < tries; i++) {
@@ -354,10 +358,27 @@ async function performAutoSwitch() {
       autoSwitchLocked = true;
     }
 
-    let trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
+    let trayColor;
     if (result?.result === 'both_failed') {
       trayColor = '#FF0000';
       console.warn('网络异常：两侧都无法ping通，已回退到原侧');
+    } else {
+      // 优先按照“本次实际判定使用的 ping 目标”来映射托盘颜色，
+      // 这样颜色就跟“场景/目标”绑定，而不是死绑 network1/network2 的序号。
+      // 注意：后端通过 serde(rename_all = "camelCase") 导出为 activePingTarget。
+      const activePing = result?.activePingTarget || null;
+      if (activePing) {
+        if (activePing === network1Config.pingTarget) {
+          trayColor = network1Config.trayColor;
+        } else if (activePing === network2Config.pingTarget) {
+          trayColor = network2Config.trayColor;
+        }
+      }
+
+      // 兜底：如果没匹配到（例如用户改过目标），仍然按 activeNetwork 侧取颜色
+      if (!trayColor) {
+        trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
+      }
     }
 
     if (trayColor) {
@@ -538,12 +559,78 @@ export function stopAutoSwitch() {
 
 // 设置自动切换配置
 export function setAutoSwitchConfig(config) {
+  const prevConfig = autoSwitchConfig;
   autoSwitchConfig = config;
   localStorage.setItem('autoSwitchConfig', JSON.stringify(config));
-  
+
+  // 如果是从“未启用”切换到“启用”，在真正应用自动切换前，先备份一下当前网卡的原始配置，
+  // 以便用户关闭自动切换时能恢复到之前的静态/DHCP 设置。
+  const wasEnabled = !!prevConfig?.enabled;
+  const nowEnabled = !!config.enabled;
+  if (!wasEnabled && nowEnabled && config.adapterName) {
+    const snap = getTargetAdapterSnapshot();
+    if (snap) {
+      const original = {
+        adapterName: snap.name,
+        isDhcp: !!snap.is_dhcp,
+        ip: snap.ip_address || '',
+        subnet: snap.subnet_mask || '',
+        gateway: snap.gateway || '',
+        dns: Array.isArray(snap.dns_servers) ? snap.dns_servers : []
+      };
+      localStorage.setItem(AUTO_SWITCH_ORIGINAL_KEY, JSON.stringify(original));
+    }
+  }
+
+  // 如果是从“启用”切换到“禁用”，尝试恢复原始配置
+  if (wasEnabled && !nowEnabled && prevConfig?.adapterName) {
+    (async () => {
+      try {
+        const raw = localStorage.getItem(AUTO_SWITCH_ORIGINAL_KEY);
+        if (!raw) return;
+        let original;
+        try {
+          original = JSON.parse(raw);
+        } catch {
+          return;
+        }
+        if (!original || original.adapterName !== prevConfig.adapterName) return;
+
+        if (original.isDhcp) {
+          await invoke('set_dhcp', { adapterName: original.adapterName });
+          if (Array.isArray(original.dns) && original.dns.length > 0) {
+            await invoke('set_dns_servers', {
+              adapterName: original.adapterName,
+              dns: original.dns
+            });
+          }
+        } else {
+          if (!original.ip || !original.subnet || !original.gateway) {
+            // 原始静态配置不完整就不强行还原
+          } else {
+            await invoke('set_static_ip', {
+              adapterName: original.adapterName,
+              ip: original.ip,
+              subnet: original.subnet,
+              gateway: original.gateway,
+              dns: Array.isArray(original.dns) ? original.dns : []
+            });
+          }
+        }
+
+        // 还原后刷新一次网卡信息
+        await refreshNetworkInfo(false, { skipRender: true });
+      } catch (e) {
+        console.error('自动切换：还原原始网络配置失败:', e);
+      } finally {
+        localStorage.removeItem(AUTO_SWITCH_ORIGINAL_KEY);
+      }
+    })();
+  }
+
   // 更新复选框状态
   updateAutoSwitchCheckbox();
-  
+
   if (config.enabled) {
     // 启用自动切换时，清除当前场景（二者只能选其一）
     if (state.currentScene) {

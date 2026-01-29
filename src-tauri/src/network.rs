@@ -22,6 +22,18 @@ fn powershell_cmd() -> Command {
     cmd
 }
 
+/// 创建 ping 命令（Windows 下禁止弹出控制台窗口）
+fn ping_cmd() -> Command {
+    let mut cmd = Command::new("ping");
+
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    cmd
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkAdapter {
     pub name: String,
@@ -748,23 +760,24 @@ async fn ping_test_on_adapter(adapter_name: &str, host: &str, timeout_sec: u64) 
         _ => return false,
     };
 
-    let output = powershell_cmd()
+    // 使用系统自带 ping.exe + -S 显式指定源地址，行为与用户在 CMD 中执行的
+    // `ping -S <ip> <host>` 保持一致，避免 Test-Connection 在不同环境下的兼容性问题。
+    let timeout_ms = timeout_sec.saturating_mul(1000);
+
+    let output = ping_cmd()
         .args(&[
-            "-Command",
-            &format!(
-                "$result = Test-Connection -ComputerName '{}' -Source '{}' -Count 1 -Quiet -TimeoutSeconds {}; if ($result) {{ Write-Output 'SUCCESS' }} else {{ Write-Output 'FAILED' }}",
-                host.replace("'", "''"),
-                src_ip.replace("'", "''"),
-                timeout_sec
-            ),
+            "-S",
+            &src_ip,
+            "-n",
+            "1",
+            "-w",
+            &timeout_ms.to_string(),
+            host,
         ])
         .output();
 
     match output {
-        Ok(out) => {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            s.contains("SUCCESS")
-        }
+        Ok(out) => out.status.success(),
         Err(_) => false,
     }
 }
@@ -858,6 +871,47 @@ async fn wait_adapter_ready(adapter_name: &str, cfg: &NetworkConfig) {
     }
 }
 
+/// 在“当前已按 cfg 应用完配置并 wait_adapter_ready 之后”，
+/// 使用指定网卡依次检测：
+///   1）ping 网关
+///   2）ping 外网（cfg.ping_target）
+/// 只有两者均成功才返回 true；否则视为该侧不可用。
+async fn test_side_connectivity(adapter_name: &str, cfg: &NetworkConfig) -> bool {
+    // 先确定应当使用的网关地址
+    let gateway = match cfg.mode.as_str() {
+        // 静态：直接使用配置中的网关
+        "static" => cfg
+            .static_config
+            .as_ref()
+            .map(|s| s.gateway.clone())
+            .unwrap_or_default(),
+        // DHCP：从当前网卡实际状态中读取网关
+        "dhcp" => match get_ipv4_and_gateway(adapter_name).await {
+            Ok((_, gw)) => gw.unwrap_or_default(),
+            Err(_) => String::new(),
+        },
+        // 其他模式一律视为失败
+        _ => String::new(),
+    };
+
+    let gateway = gateway.trim();
+    // 没有有效网关（为空或 0.0.0.0）直接视为失败
+    if gateway.is_empty() || gateway == "0.0.0.0" {
+        return false;
+    }
+
+    // 1）先 ping 网关
+    let gw_ok = ping_test_on_adapter_with_retries(adapter_name, gateway, 3, 2, 500).await;
+    if !gw_ok {
+        return false;
+    }
+
+    // 2）再 ping 外网
+    let ext_ok =
+        ping_test_on_adapter_with_retries(adapter_name, &cfg.ping_target, 3, 2, 500).await;
+    ext_ok
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkConfig {
@@ -874,6 +928,8 @@ pub struct AutoSwitchResult {
     pub message: String,
     pub active_network: String, // "network1" | "network2"
     pub result: String,         // "stay" | "switched" | "both_failed"
+    /// 实际作为“当前判定依据”的 ping 目标（方便前端按目标映射托盘颜色）
+    pub active_ping_target: Option<String>,
 }
 
 /// 自动切换网络配置（双向切换，双方均可独立选择DHCP或静态）
@@ -898,17 +954,14 @@ pub async fn auto_switch_network(
         ("网络1", "网络2", network1_config.clone(), network2_config.clone())
     };
 
-    // 1. 先检测当前侧（指定网卡发包 + 多次 ping，降低瞬时抖动/默认路由误判）
-    //    注意：这里不强制重配当前侧，而是基于现状做连通性判断，
-    //    只有在当前侧不可用时才真正切到另一侧，避免“来回切换”的视觉抖动。
-    let current_ok = ping_test_on_adapter_with_retries(
-        &adapter_name,
-        &current_cfg.ping_target,
-        3,
-        2,
-        500,
-    )
-    .await;
+    // 1. 先“按配置应用当前侧”（无论是 DHCP 还是静态），
+    //    再在该配置下用指定网卡依次检测：
+    //      1) ping 网关
+    //      2) ping 外网（用户配置的 pingTarget）
+    //    只有“网关 + 外网都 OK”才认为当前侧可用，否则尝试另一侧。
+    apply_network_config(&adapter_name, &current_cfg).await?;
+    wait_adapter_ready(&adapter_name, &current_cfg).await;
+    let current_ok = test_side_connectivity(&adapter_name, &current_cfg).await;
     if current_ok {
         return Ok(AutoSwitchResult {
             message: format!("保持{} (连接正常)", current_label),
@@ -918,6 +971,7 @@ pub async fn auto_switch_network(
                 "network1".to_string()
             },
             result: "stay".to_string(),
+            active_ping_target: Some(current_cfg.ping_target.clone()),
         });
     }
 
@@ -925,14 +979,7 @@ pub async fn auto_switch_network(
     apply_network_config(&adapter_name, &other_cfg).await?;
     // 等待配置生效/路由就绪后再 ping
     wait_adapter_ready(&adapter_name, &other_cfg).await;
-    let other_ok = ping_test_on_adapter_with_retries(
-        &adapter_name,
-        &other_cfg.ping_target,
-        3,
-        2,
-        500,
-    )
-    .await;
+    let other_ok = test_side_connectivity(&adapter_name, &other_cfg).await;
     if other_ok {
         return Ok(AutoSwitchResult {
             message: format!("已切换到{} (原{}不可用)", other_label, current_label),
@@ -942,6 +989,7 @@ pub async fn auto_switch_network(
                 "network2".to_string()
             },
             result: "switched".to_string(),
+            active_ping_target: Some(other_cfg.ping_target.clone()),
         });
     }
 
@@ -958,6 +1006,7 @@ pub async fn auto_switch_network(
             "network1".to_string()
         },
         result: "both_failed".to_string(),
+        active_ping_target: None,
     })
 }
 
