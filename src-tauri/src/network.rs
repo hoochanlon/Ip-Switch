@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use std::sync::OnceLock;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 use winapi::um::winbase::CREATE_NO_WINDOW;
+
+/// 串行化 get_network_info 调用，避免连续点击刷新时多个 PowerShell 同时执行导致卡住
+fn get_network_info_mutex() -> &'static tokio::sync::Mutex<()> {
+    static INSTANCE: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
+    INSTANCE.get_or_init(|| tokio::sync::Mutex::new(()))
+}
 
 /// 创建 PowerShell 命令（Windows 下禁止弹出控制台窗口）
 fn powershell_cmd() -> Command {
@@ -62,40 +69,47 @@ pub struct NetworkAdapter {
 
 #[tauri::command]
 pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
+    // 串行化：同一时刻只允许一次 get_network_info 执行，避免连续点击刷新时多个 PowerShell 同时跑导致卡住
+    let _guard = get_network_info_mutex().lock().await;
+
     let mut adapters = Vec::new();
 
-    // 获取网络适配器信息 - 使用 UTF-8 编码
-    let output = powershell_cmd()
-        .args(&[
-            "-Command",
-            // 合并适配器基本信息 + 统计信息（速度/收发字节/持续时间）
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
-            $adapters = Get-NetAdapter; \
-            $stats = Get-NetAdapterStatistics; \
-            $result = @(); \
-            foreach ($adapter in $adapters) { \
-              $stat = $stats | Where-Object { $_.Name -eq $adapter.Name } | Select-Object -First 1; \
-              $duration = $null; \
-              if ($adapter.Status -eq 'Up' -and $adapter.LinkUpTime) { \
-                $ts = New-TimeSpan -Start $adapter.LinkUpTime -End (Get-Date); \
-                $duration = $ts.ToString('hh\\:mm\\:ss'); \
-              } \
-              $obj = [PSCustomObject]@{ \
-                Name = $adapter.Name; \
-                InterfaceDescription = $adapter.InterfaceDescription; \
-                Status = $adapter.Status; \
-                MacAddress = $adapter.MacAddress; \
-                LinkSpeed = $adapter.LinkSpeed; \
-                Duration = $duration; \
-                BytesSent = if ($stat) { [int64]$stat.SentBytes } else { $null }; \
-                BytesReceived = if ($stat) { [int64]$stat.ReceivedBytes } else { $null }; \
-              }; \
-              $result += $obj; \
-            }; \
-            $result | ConvertTo-Json -Depth 10"
-        ])
-        .output()
-        .map_err(|e| format!("执行命令失败: {}", e))?;
+    // 获取网络适配器信息 - 放到 spawn_blocking 中执行，避免阻塞 async 运行时
+    let output = tokio::task::spawn_blocking(|| {
+        powershell_cmd()
+            .args(&[
+                "-Command",
+                // 合并适配器基本信息 + 统计信息（速度/收发字节/持续时间）
+                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
+                $adapters = Get-NetAdapter; \
+                $stats = Get-NetAdapterStatistics; \
+                $result = @(); \
+                foreach ($adapter in $adapters) { \
+                  $stat = $stats | Where-Object { $_.Name -eq $adapter.Name } | Select-Object -First 1; \
+                  $duration = $null; \
+                  if ($adapter.Status -eq 'Up' -and $adapter.LinkUpTime) { \
+                    $ts = New-TimeSpan -Start $adapter.LinkUpTime -End (Get-Date); \
+                    $duration = $ts.ToString('hh\\:mm\\:ss'); \
+                  } \
+                  $obj = [PSCustomObject]@{ \
+                    Name = $adapter.Name; \
+                    InterfaceDescription = $adapter.InterfaceDescription; \
+                    Status = $adapter.Status; \
+                    MacAddress = $adapter.MacAddress; \
+                    LinkSpeed = $adapter.LinkSpeed; \
+                    Duration = $duration; \
+                    BytesSent = if ($stat) { [int64]$stat.SentBytes } else { $null }; \
+                    BytesReceived = if ($stat) { [int64]$stat.ReceivedBytes } else { $null }; \
+                  }; \
+                  $result += $obj; \
+                }; \
+                $result | ConvertTo-Json -Depth 10"
+            ])
+            .output()
+    })
+    .await
+    .map_err(|e| format!("spawn_blocking 失败: {}", e))?
+    .map_err(|e| format!("执行命令失败: {}", e))?;
 
     // 使用 from_utf8_lossy 来处理可能的编码问题
     let mut adapter_list = String::from_utf8_lossy(&output.stdout).to_string();

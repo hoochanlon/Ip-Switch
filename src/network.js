@@ -43,11 +43,7 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
 
   // 如果不要求强制刷新，并且已有刷新任务在执行，直接复用该 Promise，避免并行多次调用后端
   if (!force && refreshInFlightPromise) {
-    // 对于手动点击“刷新”按钮的场景，如果当前已经在刷新，其实复用结果即可，
-    // 这里仍然可以根据需要显示加载提示，给用户一个“已接收到操作”的反馈。
-    if (showLoading && container) {
-      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
-    }
+    // 已在刷新时：不再覆盖为“正在加载”（避免第二次点击把已显示的内容盖掉），直接复用当前请求
     return refreshInFlightPromise;
   }
 
