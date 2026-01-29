@@ -60,7 +60,42 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
     try {
       const prevInfo = state.currentNetworkInfo;
       const prevSig = buildNetworkSignature(prevInfo);
-      state.setCurrentNetworkInfo(await invoke('get_network_info'));
+      
+      // 显示加载状态，提升用户体验
+      const startTime = Date.now();
+      
+      // 添加超时处理：如果超过 10 秒还没返回，抛出超时错误
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('网络信息加载超时（超过10秒），可能是 PowerShell 命令执行过慢或卡住'));
+        }, 10000);
+      });
+      
+      const networkInfoPromise = invoke('get_network_info');
+      
+      // 如果超过 500ms 还没返回，显示加载提示（即使 showLoading 为 false）
+      const loadingTimeout = setTimeout(() => {
+        if (container && !showLoading && container.innerHTML.trim() === '') {
+          container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
+        }
+      }, 500);
+      
+      // 使用 Promise.race 实现超时
+      let networkInfo;
+      try {
+        networkInfo = await Promise.race([networkInfoPromise, timeoutPromise]);
+        clearTimeout(loadingTimeout);
+      } catch (timeoutError) {
+        clearTimeout(loadingTimeout);
+        throw timeoutError;
+      }
+      
+      const loadTime = Date.now() - startTime;
+      if (loadTime > 1000) {
+        console.warn(`网络信息加载耗时较长: ${loadTime}ms`);
+      }
+      
+      state.setCurrentNetworkInfo(networkInfo);
       
       if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
         // 只在显示加载提示或容器为空时才显示错误信息
@@ -72,7 +107,8 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
       
       // 默认初始化筛选：仅在“尚未初始化过”时，按主要网卡（WiFi + 以太网）做一次勾选
       // 之后用户的任何选择（包含“全选”）都不会被刷新逻辑覆盖
-      if (!state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
+      // 已移至渲染之后执行，避免阻塞渲染
+      if (false && !state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
         const mainAdapters = state.currentNetworkInfo.filter(adapter => {
           const name = adapter.name.toLowerCase();
           const networkType = (adapter.network_type || '').toLowerCase();
@@ -115,11 +151,76 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
   
       // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
       window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
+      
+      // 默认初始化筛选：仅在"尚未初始化过"时，按主要网卡（WiFi + 以太网）做一次勾选
+      // 之后用户的任何选择（包含"全选"）都不会被刷新逻辑覆盖
+      // 优化：延迟初始化筛选，避免在加载过程中阻塞渲染
+      if (!state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
+        // 使用 setTimeout 延迟执行，避免阻塞主流程
+        setTimeout(() => {
+          try {
+            const mainAdapters = state.currentNetworkInfo.filter(adapter => {
+              const name = adapter.name.toLowerCase();
+              const networkType = (adapter.network_type || '').toLowerCase();
+      
+              if (networkType === 'bluetooth' || name.includes('bluetooth')) {
+                return false;
+              }
+      
+              const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+              const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
+      
+              const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
+              const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
+                name.includes('ethernet') ||
+                name.includes('以太网') ||
+                (name.includes('lan') && !isVirtual && !name.includes('wlan'))
+              ));
+      
+              return (isWifi || isEthernet) && !isVirtual;
+            });
+      
+            if (mainAdapters.length > 0) {
+              const names = new Set(mainAdapters.map(a => a.name));
+              state.setSelectedNetworkAdapters(names);
+              // 如果已经渲染过，需要重新渲染以应用筛选
+              if (container && container.children.length > 0) {
+                renderNetworkInfo();
+              }
+            } else {
+              // 如果没有检测到主要网卡，设置为全选（null），避免过滤掉所有网卡
+              console.warn('未检测到主要网卡，将显示所有网卡');
+              state.setSelectedNetworkAdapters(null);
+              state.setSelectedNetworkAdaptersInitialized(true);
+              // 如果已经渲染过，需要重新渲染以显示所有网卡
+              if (container && container.children.length > 0) {
+                renderNetworkInfo();
+              }
+            }
+          } catch (e) {
+            console.error('初始化筛选失败:', e);
+            // 即使失败也标记为已初始化，避免反复尝试
+            state.setSelectedNetworkAdaptersInitialized(true);
+          }
+        }, 0); // 延迟到下一个事件循环，确保渲染先完成
+      }
     } catch (error) {
       console.error('获取网络信息失败:', error);
-      // 只在显示加载提示或容器为空时才显示错误信息
-      if (container && (showLoading || container.innerHTML.trim() === '')) {
-        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('fetchNetworkInfoFailed', { error })}<br><small>${t('ensureAdmin')}</small></div>`;
+      // loadingTimeout 可能已经清除，但为了安全还是清除一次
+      if (typeof loadingTimeout !== 'undefined') {
+        clearTimeout(loadingTimeout);
+      }
+      
+      const errorMsg = String(error || '');
+      // 显示错误信息（无论是否显示加载提示）
+      if (container) {
+        let displayError = errorMsg;
+        if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
+          displayError = '网络信息加载超时（超过10秒），可能是 PowerShell 命令执行过慢。\n\n建议：\n1. 检查是否有其他程序占用网络配置\n2. 尝试以管理员权限运行\n3. 重启应用';
+        }
+        // 使用转义 HTML 避免换行符问题
+        const safeError = displayError.replace(/\n/g, '<br>');
+        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('fetchNetworkInfoFailed', { error: safeError })}<br><small>${t('ensureAdmin')}</small><br><br><button class="btn btn-primary" onclick="refreshNetworkInfo(true)">重试</button></div>`;
       }
       
       // 即使获取失败，也检查网络状态（通过事件触发）
@@ -157,6 +258,7 @@ export function startFastMediaStateWatcher() {
         ]));
 
         // 仅就地更新 is_enabled 和 media_status 字段，其它字段保持不变
+        let hasSignificantChange = false;
         const updated = state.currentNetworkInfo.map(adapter => {
           const key = String(adapter.name || '').toLowerCase();
           if (!map.has(key)) return adapter;
@@ -166,12 +268,26 @@ export function startFastMediaStateWatcher() {
               adapter.media_status === stateInfo.media_status) {
             return adapter;
           }
+          // 检测是否有"网线插入"这种需要重新显示按钮的变化
+          const oldMediaStatus = (adapter.media_status || '').toLowerCase();
+          const newMediaStatus = (stateInfo.media_status || '').toLowerCase();
+          const wasCableUnplugged = oldMediaStatus === 'upmediadisconnected' || oldMediaStatus === 'disconnected';
+          const isNowCablePlugged = newMediaStatus === 'up' && stateInfo.is_enabled;
+          if (wasCableUnplugged && isNowCablePlugged) {
+            hasSignificantChange = true; // 网线插入，需要重新渲染以显示按钮
+          }
           return { ...adapter, is_enabled: stateInfo.is_enabled, media_status: stateInfo.media_status };
         });
 
         state.setCurrentNetworkInfo(updated);
-        // 仅更新卡片上的动态字段（状态徽章 / 媒体状态文案 / 按钮），不整卡重绘
-        updateNetworkInfoStatsView();
+        
+        // 如果有显著变化（如网线插入），重新渲染整个卡片以确保按钮正确显示
+        if (hasSignificantChange) {
+          renderNetworkInfo();
+        } else {
+          // 仅更新卡片上的动态字段（状态徽章 / 媒体状态文案 / 按钮），不整卡重绘
+          updateNetworkInfoStatsView();
+        }
       } catch (e) {
         console.warn('快速刷新媒体状态失败:', e);
       } finally {
@@ -414,6 +530,12 @@ function renderFullMode(container) {
   // 先按“勾选显示网卡”过滤（null 表示全选/不做过滤）
   if (state.selectedNetworkAdapters !== null) {
     filteredAdapters = filteredAdapters.filter(adapter => state.selectedNetworkAdapters.has(adapter.name));
+    // 如果筛选后没有结果，且筛选状态不是用户主动设置的，可能是筛选状态过期了，重置为全选
+    if (filteredAdapters.length === 0 && state.currentNetworkInfo.length > 0) {
+      console.warn('筛选状态导致没有匹配的网卡，重置为全选');
+      state.setSelectedNetworkAdapters(null);
+      filteredAdapters = [...state.currentNetworkInfo]; // 重新使用所有网卡
+    }
   }
 
   if (filterKeyword) {
@@ -628,7 +750,7 @@ export function updateNetworkInfoStatsView() {
         // 网线被拔出时，隐藏按钮（网卡本身是启用的，不需要启用按钮）
         toggleBtn.style.display = 'none';
       } else {
-        // 正常情况：显示启用/禁用按钮
+        // 正常情况：显示启用/禁用按钮（网线插入后，如果之前被隐藏，现在要显示出来）
         toggleBtn.style.display = '';
         const nextAction = adapter.is_enabled ? 'disable' : 'enable';
         const nextLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
@@ -639,9 +761,11 @@ export function updateNetworkInfoStatsView() {
         toggleBtn.textContent = nextLabel;
         toggleBtn.className = nextClass;
       }
-    } else if (!isCableUnplugged) {
-      // 如果按钮不存在但应该显示，需要重新渲染（这种情况很少见，但为了完整性）
-      // 这里不做处理，因为 updateNetworkInfoStatsView 只做就地更新，不重新创建按钮
+    } else if (!isCableUnplugged && adapter.is_enabled) {
+      // 如果按钮不存在但应该显示（网线插入后，网卡已启用），需要重新渲染整个卡片
+      // 这种情况发生在：之前网线被拔出时按钮被隐藏，现在网线插入后需要重新显示
+      renderNetworkInfo();
+      return; // 重新渲染后直接返回，避免继续更新
     }
   });
 }

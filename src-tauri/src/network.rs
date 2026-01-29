@@ -130,7 +130,7 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
         });
 
     // 使用单个 PowerShell 命令获取所有适配器的完整信息
-    let all_configs = get_all_ip_configs().unwrap_or_default();
+    let all_configs = get_all_ip_configs().await.unwrap_or_default();
     
     for adapter_json in adapters_json {
         let name = adapter_json["Name"]
@@ -228,17 +228,26 @@ struct IpConfig {
 }
 
 // 使用单个命令获取所有适配器的IP配置（更快）
-fn get_all_ip_configs() -> Result<std::collections::HashMap<String, IpConfig>, String> {
+async fn get_all_ip_configs() -> Result<std::collections::HashMap<String, IpConfig>, String> {
     use std::collections::HashMap;
     let mut configs = HashMap::new();
     
     // 一次性获取所有适配器的IP配置
-    let output = powershell_cmd()
-        .args(&[
-            "-Command",
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $adapters = Get-NetAdapter; $result = @(); foreach ($adapter in $adapters) { $ip = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1; $route = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1; $interface = Get-NetIPInterface -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dns = Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dhcpValue = 0; if ($interface) { $dhcpValue = [int]$interface.Dhcp }; $obj = @{ Name = $adapter.Name; IP = if ($ip) { $ip.IPAddress } else { $null }; Prefix = if ($ip) { $ip.PrefixLength } else { $null }; Gateway = if ($route) { $route.NextHop } else { $null }; Dhcp = $dhcpValue; DNS = if ($dns -and $dns.ServerAddresses) { ($dns.ServerAddresses -join ',') } else { '' } }; $result += $obj }; $result | ConvertTo-Json -Depth 10"
-        ])
-        .output();
+    // 优化：添加超时处理，避免 PowerShell 命令卡住导致整个应用无响应
+    let output = tokio::time::timeout(
+        tokio::time::Duration::from_secs(8), // 8秒超时
+        tokio::task::spawn_blocking(|| {
+            powershell_cmd()
+                .args(&[
+                    "-Command",
+                    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $adapters = Get-NetAdapter; $result = @(); foreach ($adapter in $adapters) { $ip = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1; $route = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1; $interface = Get-NetIPInterface -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dns = Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue; $dhcpValue = 0; if ($interface) { $dhcpValue = [int]$interface.Dhcp }; $obj = @{ Name = $adapter.Name; IP = if ($ip) { $ip.IPAddress } else { $null }; Prefix = if ($ip) { $ip.PrefixLength } else { $null }; Gateway = if ($route) { $route.NextHop } else { $null }; Dhcp = $dhcpValue; DNS = if ($dns -and $dns.ServerAddresses) { ($dns.ServerAddresses -join ',') } else { '' } }; $result += $obj }; $result | ConvertTo-Json -Depth 10"
+                ])
+                .output()
+        })
+    )
+    .await
+    .map_err(|_| "获取IP配置超时（超过8秒）".to_string())?
+    .map_err(|e| format!("执行PowerShell命令失败: {}", e))?;
     
     let output = match output {
         Ok(output) => output,
