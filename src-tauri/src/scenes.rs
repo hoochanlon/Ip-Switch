@@ -230,20 +230,74 @@ pub async fn restore_backup(app: tauri::AppHandle) -> Result<(), String> {
     let backup: Scene = serde_json::from_str(&content)
         .map_err(|e| format!("解析备份文件失败: {}", e))?;
     
+    // 获取当前系统中的网卡列表，用于验证备份中的网卡是否存在
+    use crate::network::{get_network_info, set_static_ip, set_dhcp};
+    let current_adapters = get_network_info().await
+        .map_err(|e| format!("获取当前网卡信息失败: {}", e))?;
+    let current_adapter_names: std::collections::HashSet<String> = current_adapters
+        .iter()
+        .map(|a| a.name.clone())
+        .collect();
+    
     // 只恢复网络配置（不恢复Hosts和代理）
-    use crate::network::{set_static_ip, set_dhcp};
+    let mut success_count = 0;
+    let mut failed_adapters = Vec::new();
+    
     for (adapter_name, config) in backup.network_configs {
-        if config.is_dhcp {
-            set_dhcp(adapter_name).await?;
-        } else if let (Some(ip), Some(subnet), Some(gateway)) = (config.ip, config.subnet, config.gateway) {
+        // 检查网卡是否存在
+        if !current_adapter_names.contains(&adapter_name) {
+            eprintln!("警告: 备份中的网卡 '{}' 在当前系统中不存在，跳过恢复", adapter_name);
+            failed_adapters.push(format!("网卡 '{}' 不存在", adapter_name));
+            continue;
+        }
+        
+        // 尝试恢复该网卡的配置
+        let result = if config.is_dhcp {
+            set_dhcp(adapter_name.clone()).await
+        } else if let (Some(ip), Some(subnet), Some(gateway)) = (config.ip.clone(), config.subnet.clone(), config.gateway.clone()) {
             set_static_ip(
-                adapter_name,
+                adapter_name.clone(),
                 ip,
                 subnet,
                 gateway,
                 config.dns.unwrap_or_default(),
-            ).await?;
+            ).await
+        } else {
+            // 配置不完整，跳过
+            eprintln!("警告: 网卡 '{}' 的备份配置不完整，跳过恢复", adapter_name);
+            failed_adapters.push(format!("网卡 '{}' 配置不完整", adapter_name));
+            continue;
+        };
+        
+        match result {
+            Ok(_) => {
+                success_count += 1;
+                eprintln!("成功恢复网卡 '{}' 的配置", adapter_name);
+            }
+            Err(e) => {
+                eprintln!("恢复网卡 '{}' 失败: {}", adapter_name, e);
+                failed_adapters.push(format!("网卡 '{}': {}", adapter_name, e));
+            }
         }
+        
+        // 每个网卡配置后等待一下，确保系统有时间应用配置
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    }
+    
+    // 等待系统应用所有网络配置
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    
+    // 如果有失败的网卡，返回详细错误信息
+    if !failed_adapters.is_empty() {
+        let error_msg = if success_count > 0 {
+            format!("部分网卡恢复失败（成功: {}，失败: {}）: {}", 
+                success_count, 
+                failed_adapters.len(),
+                failed_adapters.join("; "))
+        } else {
+            format!("所有网卡恢复失败: {}", failed_adapters.join("; "))
+        };
+        return Err(error_msg);
     }
     
     // 不恢复Hosts和代理配置，场景只管理网卡IP

@@ -613,28 +613,54 @@ window.restoreScene = async function() {
   
   // 异步执行恢复操作，不阻塞UI
   try {
+    console.log('开始恢复备份配置...');
+    
     // 后台执行恢复操作
     const restorePromise = invoke('restore_backup');
     
     // 等待恢复完成
     await restorePromise;
     
-    // 等待一下，让Windows系统有时间应用网络配置
-    await new Promise(resolve => setTimeout(resolve, 300));
+    console.log('备份恢复完成，等待系统应用网络配置...');
+    
+    // 增加等待时间，确保Windows系统有足够时间应用网络配置
+    // 网络配置应用通常需要 500-1000ms
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    console.log('刷新网络状态...');
     
     // 更新状态指示器（不等待网络信息刷新，避免响应缓慢）
     await updateStatusIndicator();
     
-    // 异步刷新网络信息，不阻塞UI响应
-    refreshNetworkInfo(false, { skipRender: true }).catch(error => {
+    // 等待一下再刷新网络信息，确保系统已经应用了配置
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 刷新网络信息，这次强制刷新以确保显示最新状态
+    try {
+      await refreshNetworkInfo(false, { skipRender: false });
+      console.log('网络信息刷新完成');
+    } catch (error) {
       console.warn('刷新网络信息失败:', error);
-    });
+      // 即使刷新失败，也尝试再次刷新一次
+      setTimeout(() => {
+        refreshNetworkInfo(false, { skipRender: false }).catch(err => {
+          console.warn('第二次刷新网络信息也失败:', err);
+        });
+      }, 1000);
+    }
     
     alert(t('restoreSceneOk'));
   } catch (error) {
-    alert(t('restoreSceneFailed', { error }));
+    console.error('恢复备份失败:', error);
+    // 显示详细的错误信息
+    const errorMsg = typeof error === 'string' ? error : (error.message || String(error));
+    alert(t('restoreSceneFailed', { error: errorMsg }));
     // 如果失败，重新渲染以恢复状态
     await renderScenes();
     await updateStatusIndicator();
+    // 即使失败也尝试刷新网络信息，看看当前状态
+    refreshNetworkInfo(false, { skipRender: false }).catch(err => {
+      console.warn('失败后刷新网络信息也失败:', err);
+    });
   }
 };
