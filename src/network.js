@@ -42,7 +42,6 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
     const prevInfo = state.currentNetworkInfo;
     const prevSig = buildNetworkSignature(prevInfo);
     state.setCurrentNetworkInfo(await invoke('get_network_info'));
-    console.log('获取到的网络信息:', state.currentNetworkInfo);
     
     if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
       // 只在显示加载提示或容器为空时才显示错误信息

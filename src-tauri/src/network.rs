@@ -741,10 +741,11 @@ async fn ping_test_on_adapter(adapter_name: &str, host: &str, timeout_sec: u64) 
         Err(_) => (None, None),
     };
 
-    // 没有可用 IPv4 时回退到普通 ping
+    // 没有可用 IPv4 时，直接认为“当前网卡不可用”，而不是退回到普通 ping，
+    // 避免被其它网卡（例如 Wi‑Fi 默认路由）误判为“其实能通”。
     let src_ip = match ip {
         Some(v) if !v.trim().is_empty() => v,
-        _ => return ping_test(host.to_string(), timeout_sec).await.unwrap_or(false),
+        _ => return false,
     };
 
     let output = powershell_cmd()
