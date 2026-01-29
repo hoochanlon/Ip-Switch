@@ -96,6 +96,11 @@ export function initAutoSwitch() {
       updateAutoSwitchCheckbox();
       if (autoSwitchConfig.enabled) {
         startAutoSwitch();
+        // 应用启动时，如果自动双向切换已启用，立即应用配置（不等待网线插拔）
+        // 使用 force=true 强制应用，确保网卡配置优先使用双向切换配置
+        performAutoSwitch(true).catch((err) => {
+          console.warn('自动切换：启动时应用配置失败:', err);
+        });
       }
     } catch (error) {
       console.error('加载自动切换配置失败:', error);
@@ -286,7 +291,8 @@ function normalizeNetworkConfig(cfg, defaults) {
 }
 
 // 执行自动切换
-async function performAutoSwitch() {
+// force: 如果为 true，即使处于锁定状态也强制执行（用于启动时强制应用配置）
+async function performAutoSwitch(force = false) {
   if (!autoSwitchConfig || !autoSwitchConfig.enabled) {
     console.debug('[auto-switch] performAutoSwitch 跳过：未启用或无配置');
     return;
@@ -294,7 +300,8 @@ async function performAutoSwitch() {
 
   // 一次“拔插循环”内，一旦已经根据 ping -S 选定了 DHCP/静态，就不再重复判定，
   // 直到检测到网线被拔掉（上面的 checkEthernetStatusChange 会解锁）。
-  if (autoSwitchLocked) {
+  // 但启动时（force=true）应该强制应用一次配置，确保网卡配置正确。
+  if (!force && autoSwitchLocked) {
     console.debug('[auto-switch] performAutoSwitch 跳过：当前处于锁定状态（等待下一次拔插网线）');
     return;
   }
@@ -639,7 +646,8 @@ export function setAutoSwitchConfig(config) {
     }
     startAutoSwitch();
     // 保存/启用配置后，立即做一次基于 ping -S 的自动判定，选定 DHCP 或静态
-    performAutoSwitch().catch((err) => {
+    // 使用 force=true 强制应用，确保网卡配置优先使用双向切换配置（即使之前已锁定）
+    performAutoSwitch(true).catch((err) => {
       console.warn('自动切换：保存配置后自动判定失败:', err);
       // 回退到仅更新托盘颜色
       applyAutoSwitchTrayColor().catch((err2) => {
