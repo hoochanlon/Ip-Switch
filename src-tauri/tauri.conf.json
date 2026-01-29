@@ -22,9 +22,9 @@
       {
         "title": "IP 配置管理器",
         "width": 1200,
-        "height": 950,
+        "height": 960,
         "minWidth": 1200,
-        "minHeight": 950,
+        "minHeight": 960,
         "resizable": true,
         "fullscreen": false,
         "visible": true,

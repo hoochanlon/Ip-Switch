@@ -5,6 +5,10 @@ import * as state from './state.js';
 import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 
+// 避免并发多次调用后端 `get_network_info` 导致同时创建大量 PowerShell 进程
+// 使用单航班（single-flight）机制：同一时刻只允许一个刷新在执行，其它调用复用同一个 Promise
+let refreshInFlightPromise = null;
+
 function buildNetworkSignature(list) {
   if (!Array.isArray(list)) return '';
   // 只用“会影响用户感知的状态”做签名：启用状态 / DHCP / IP / 网关 / DNS
@@ -29,83 +33,103 @@ function buildNetworkSignature(list) {
 // showLoading: 是否显示加载提示（默认 false，静默刷新）
 // options:
 //   - skipRender: 仅更新状态，不重新渲染 DOM，避免界面“闪一下”
+//   - smartRender: 根据关键字段变化决定是否重绘
+//   - force: 是否在已有刷新任务进行中时“抢占”并重新发起一次刷新（默认 false）
 export async function refreshNetworkInfo(showLoading = false, options = {}) {
-  const { skipRender = false, smartRender = false } = options;
+  const { skipRender = false, smartRender = false, force = false } = options;
   const container = document.getElementById('network-info');
-  
-  // 只在需要显示加载提示时才清空内容
-  if (showLoading) {
-    container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
+
+  // 如果不要求强制刷新，并且已有刷新任务在执行，直接复用该 Promise，避免并行多次调用后端
+  if (!force && refreshInFlightPromise) {
+    // 对于手动点击“刷新”按钮的场景，如果当前已经在刷新，其实复用结果即可，
+    // 这里仍然可以根据需要显示加载提示，给用户一个“已接收到操作”的反馈。
+    if (showLoading && container) {
+      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
+    }
+    return refreshInFlightPromise;
   }
-  
-  try {
-    const prevInfo = state.currentNetworkInfo;
-    const prevSig = buildNetworkSignature(prevInfo);
-    state.setCurrentNetworkInfo(await invoke('get_network_info'));
-    
-    if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
-      // 只在显示加载提示或容器为空时才显示错误信息
-      if (showLoading || container.innerHTML.trim() === '') {
-        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('noAdaptersFound')}</div>`;
-      }
-      return;
+
+  const run = (async () => {
+    // 只在需要显示加载提示时才清空内容
+    if (showLoading && container) {
+      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #718096;">${t('loadingNetworkInfo')}</div>`;
     }
     
-    // 默认初始化筛选：仅在“尚未初始化过”时，按主要网卡（WiFi + 以太网）做一次勾选
-    // 之后用户的任何选择（包含“全选”）都不会被刷新逻辑覆盖
-    if (!state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
-      const mainAdapters = state.currentNetworkInfo.filter(adapter => {
-        const name = adapter.name.toLowerCase();
-        const networkType = (adapter.network_type || '').toLowerCase();
-
-        if (networkType === 'bluetooth' || name.includes('bluetooth')) {
-          return false;
+    try {
+      const prevInfo = state.currentNetworkInfo;
+      const prevSig = buildNetworkSignature(prevInfo);
+      state.setCurrentNetworkInfo(await invoke('get_network_info'));
+      
+      if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) {
+        // 只在显示加载提示或容器为空时才显示错误信息
+        if (container && (showLoading || container.innerHTML.trim() === '')) {
+          container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('noAdaptersFound')}</div>`;
         }
-
-        const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
-        const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
-
-        const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
-        const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
-          name.includes('ethernet') ||
-          name.includes('以太网') ||
-          (name.includes('lan') && !isVirtual && !name.includes('wlan'))
-        ));
-
-        return (isWifi || isEthernet) && !isVirtual;
-      });
-
-      if (mainAdapters.length > 0) {
-        const names = new Set(mainAdapters.map(a => a.name));
-        state.setSelectedNetworkAdapters(names);
-      } else {
-        // 如果没有检测到主要网卡，也认为初始化完成，避免反复尝试
-        state.setSelectedNetworkAdaptersInitialized(true);
+        return;
       }
+      
+      // 默认初始化筛选：仅在“尚未初始化过”时，按主要网卡（WiFi + 以太网）做一次勾选
+      // 之后用户的任何选择（包含“全选”）都不会被刷新逻辑覆盖
+      if (!state.selectedNetworkAdaptersInitialized && Array.isArray(state.currentNetworkInfo)) {
+        const mainAdapters = state.currentNetworkInfo.filter(adapter => {
+          const name = adapter.name.toLowerCase();
+          const networkType = (adapter.network_type || '').toLowerCase();
+  
+          if (networkType === 'bluetooth' || name.includes('bluetooth')) {
+            return false;
+          }
+  
+          const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+          const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
+  
+          const isWifi = networkType === 'wifi' || (adapter.is_wireless && networkType !== 'bluetooth');
+          const isEthernet = networkType === 'ethernet' || (!adapter.is_wireless && (
+            name.includes('ethernet') ||
+            name.includes('以太网') ||
+            (name.includes('lan') && !isVirtual && !name.includes('wlan'))
+          ));
+  
+          return (isWifi || isEthernet) && !isVirtual;
+        });
+  
+        if (mainAdapters.length > 0) {
+          const names = new Set(mainAdapters.map(a => a.name));
+          state.setSelectedNetworkAdapters(names);
+        } else {
+          // 如果没有检测到主要网卡，也认为初始化完成，避免反复尝试
+          state.setSelectedNetworkAdaptersInitialized(true);
+        }
+      }
+  
+      // 渲染列表（允许调用方选择跳过渲染，避免自动刷新导致选中卡片闪烁）
+      const nextSig = buildNetworkSignature(state.currentNetworkInfo);
+      const shouldRerender = prevSig !== nextSig;
+      if (!skipRender || (smartRender && shouldRerender)) {
+        renderNetworkInfo();
+      } else if (container && container.children.length > 0) {
+        // 已经有列表时，做一次“就地更新”而非整体重绘，让统计数据仍然实时变化
+        updateNetworkInfoStatsView();
+      }
+  
+      // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
+      window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
+    } catch (error) {
+      console.error('获取网络信息失败:', error);
+      // 只在显示加载提示或容器为空时才显示错误信息
+      if (container && (showLoading || container.innerHTML.trim() === '')) {
+        container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('fetchNetworkInfoFailed', { error })}<br><small>${t('ensureAdmin')}</small></div>`;
+      }
+      
+      // 即使获取失败，也检查网络状态（通过事件触发）
+      window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
     }
+  })();
 
-    // 渲染列表（允许调用方选择跳过渲染，避免自动刷新导致选中卡片闪烁）
-    const nextSig = buildNetworkSignature(state.currentNetworkInfo);
-    const shouldRerender = prevSig !== nextSig;
-    if (!skipRender || (smartRender && shouldRerender)) {
-      renderNetworkInfo();
-    } else if (container && container.children.length > 0) {
-      // 已经有列表时，做一次“就地更新”而非整体重绘，让统计数据仍然实时变化
-      updateNetworkInfoStatsView();
-    }
+  refreshInFlightPromise = run.finally(() => {
+    refreshInFlightPromise = null;
+  });
 
-    // 通知依赖网络信息的逻辑（托盘图标/自动切换等）立即重新计算
-    window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
-  } catch (error) {
-    console.error('获取网络信息失败:', error);
-    // 只在显示加载提示或容器为空时才显示错误信息
-    if (showLoading || container.innerHTML.trim() === '') {
-      container.innerHTML = `<div style="text-align: center; padding: 20px; color: #e53e3e;">${t('fetchNetworkInfoFailed', { error })}<br><small>${t('ensureAdmin')}</small></div>`;
-    }
-    
-    // 即使获取失败，也检查网络状态（通过事件触发）
-    window.dispatchEvent(new CustomEvent('networkInfoUpdated'));
-  }
+  return refreshInFlightPromise;
 }
 
 // 渲染网络信息

@@ -730,21 +730,10 @@ pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {
     Ok(output_str.contains("SUCCESS"))
 }
 
-/// 多次 ping（任意一次成功即视为可用），用于降低短暂抖动/解析延迟导致的误判。
-async fn ping_test_with_retries(host: &str, timeout_sec: u64, attempts: u32, delay_ms: u64) -> bool {
-    let tries = attempts.max(1);
-    for i in 0..tries {
-        let ok = ping_test(host.to_string(), timeout_sec).await.unwrap_or(false);
-        if ok {
-            return true;
-        }
-        // 最后一次不必再等待
-        if i + 1 < tries {
-            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-        }
-    }
-    false
-}
+// NOTE: 旧的“基于 Test-Connection 的多次 ping 重试”逻辑目前已经不再使用，
+// 实际自动切换相关的可用性检测统一走 ping_test_on_adapter_with_retries。
+// 为避免 dead_code 警告，这里暂时移除未使用的辅助函数；如果后续需要恢复，
+// 可以从 Git 历史中找回或基于 ping_cmd 重新实现。
 
 /// 尽量使用指定网卡的 IPv4 作为 Source 进行 ping，避免系统默认路由（例如 Wi‑Fi）导致“以太网配置错了也能 ping 通”的误判。
 async fn ping_test_on_adapter(adapter_name: &str, host: &str, timeout_sec: u64) -> bool {
