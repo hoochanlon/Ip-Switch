@@ -831,11 +831,13 @@ async fn get_ipv4_and_gateway(adapter_name: &str) -> Result<(Option<String>, Opt
 }
 
 /// 等待网卡在应用配置后进入“更稳定的可用状态”，避免 DHCP/路由未就绪就 ping 误判。
+/// 优化：减少等待时间以提升响应速度
 async fn wait_adapter_ready(adapter_name: &str, cfg: &NetworkConfig) {
     match cfg.mode.as_str() {
         "dhcp" => {
-            // 最多等待约 15s：等到拿到非 169.254.* 的 IPv4 且存在默认网关
-            for _ in 0..15 {
+            // 优化：最多等待约 6s（从 15s 降低），每秒检查一次
+            // DHCP 通常 2-4 秒内就能拿到 IP，6 秒足够大多数情况
+            for _ in 0..6 {
                 if let Ok((ip, gw)) = get_ipv4_and_gateway(adapter_name).await {
                     let ip_ok = ip.as_deref().is_some_and(|s| !s.starts_with("169.254."));
                     let gw_ok = gw.as_deref().is_some_and(|s| s != "0.0.0.0");
@@ -847,13 +849,14 @@ async fn wait_adapter_ready(adapter_name: &str, cfg: &NetworkConfig) {
             }
         }
         "static" => {
-            // 静态通常很快，但仍给系统一点时间更新路由/接口状态
+            // 优化：静态模式最多等待约 1.5s（从 3s 降低），每 200ms 检查一次
+            // 静态 IP 配置通常很快（<500ms），1.5 秒足够
             let expected_ip = cfg
                 .static_config
                 .as_ref()
                 .map(|s| s.ip.as_str())
                 .unwrap_or("");
-            for _ in 0..10 {
+            for _ in 0..8 {
                 if expected_ip.is_empty() {
                     break;
                 }
@@ -862,7 +865,7 @@ async fn wait_adapter_ready(adapter_name: &str, cfg: &NetworkConfig) {
                         break;
                     }
                 }
-                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
         }
         _ => {
@@ -900,15 +903,18 @@ async fn test_side_connectivity(adapter_name: &str, cfg: &NetworkConfig) -> bool
         return false;
     }
 
+    // 优化：减少重试次数和超时时间以提升响应速度
+    // 网关 ping：2 次重试 × 1 秒超时（从 3 次 × 2 秒降低）
+    // 外网 ping：同样 2 次重试 × 1 秒超时
     // 1）先 ping 网关
-    let gw_ok = ping_test_on_adapter_with_retries(adapter_name, gateway, 3, 2, 500).await;
+    let gw_ok = ping_test_on_adapter_with_retries(adapter_name, gateway, 1, 2, 300).await;
     if !gw_ok {
         return false;
     }
 
     // 2）再 ping 外网
     let ext_ok =
-        ping_test_on_adapter_with_retries(adapter_name, &cfg.ping_target, 3, 2, 500).await;
+        ping_test_on_adapter_with_retries(adapter_name, &cfg.ping_target, 1, 2, 300).await;
     ext_ok
 }
 
