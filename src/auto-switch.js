@@ -17,6 +17,11 @@ let lastEthernetUpTriggerAt = 0;
 let lastFailureCooldownAt = 0;
 let consecutiveCurrentFailures = 0;
 let lastCurrentOkAt = 0;
+let isEthernetConnected = null;
+let autoSwitchLocked = false;
+let autoSwitchLockedAt = 0;
+let ethernetStatusDebounceTimer = null;
+let pendingEthernetStatus = null;
 
 // 稳定性策略：避免网络抖动/切换生效延迟导致“来回切”
 const AUTO_SWITCH_MIN_INTERVAL_MS = 8000; // 最短触发间隔（避免事件风暴）
@@ -55,10 +60,10 @@ function isValidDhcpLease(adapter) {
   // 后端字段：is_dhcp / ip_address / gateway
   if (!adapter.is_dhcp) return false;
   const ip = String(adapter.ip_address || '').trim();
-  const gw = String(adapter.gateway || '').trim();
   // DHCP 未拿到租约时常见：169.254.*（APIPA）+ 无网关
   if (!ip || ip.startsWith('169.254.')) return false;
-  if (!gw || gw === '0.0.0.0') return false;
+  // 注意：某些环境下网关字段可能为空/延迟更新（或使用特殊路由策略），
+  // 但 DHCP 已分配到有效 IP 仍应视为“稳定”，否则会被误判为失败进而切到静态配置。
   return true;
 }
 
@@ -195,52 +200,68 @@ function checkEthernetStatusChange() {
     return;
   }
   
-  const ethernetAdapter = state.currentNetworkInfo?.find(adapter => {
-    const name = adapter.name.toLowerCase();
-    const networkType = (adapter.network_type || '').toLowerCase();
-    
-    // 排除虚拟网卡和蓝牙
-    const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
-    const isVirtual = virtualKeywords.some(keyword => name.includes(keyword));
-    const isBluetooth = networkType === 'bluetooth' || name.includes('bluetooth');
-    
-    if (isVirtual || isBluetooth) {
-      return false;
-    }
-    
-    // 检查以太网
-    return networkType === 'ethernet' || (!adapter.is_wireless && (
-      name.includes('ethernet') || 
-      name.includes('以太网') ||
-      (name.includes('lan') && !isVirtual && !name.includes('wlan'))
-    ));
-  });
+  // 只监控“自动切换目标网卡”的 Up/Down，避免其它以太网/虚拟网卡波动导致误解锁
+  const target = getTargetAdapterSnapshot();
+  if (!target) return;
+
+  const targetName = String(target.name || '').toLowerCase();
+  const targetType = String(target.network_type || '').toLowerCase();
+  const virtualKeywords = ['virtualbox', 'vmware', 'npcap', 'loopback', 'tunnel', 'vpn', 'tap', 'wintun'];
+  const isVirtual = virtualKeywords.some((k) => targetName.includes(k));
+  const isBluetooth = targetType === 'bluetooth' || targetName.includes('bluetooth');
+  if (isVirtual || isBluetooth) return;
+
+  const isTargetEthernet = targetType === 'ethernet' || (!target.is_wireless && (
+    targetName.includes('ethernet') ||
+    targetName.includes('以太网') ||
+    (targetName.includes('lan') && !isVirtual && !targetName.includes('wlan'))
+  ));
+  if (!isTargetEthernet) return;
   
-  if (ethernetAdapter) {
-    const currentStatus = ethernetAdapter.is_enabled;
+  {
+    const currentStatus = !!target.is_enabled;
+    isEthernetConnected = !!currentStatus;
     
     // 检测到状态变化（从断开到连接，或从连接到断开）
     if (lastEthernetStatus !== null && lastEthernetStatus !== currentStatus) {
       console.log('检测到以太网状态变化:', lastEthernetStatus, '->', currentStatus);
+
+      const now = Date.now();
+      // 切换过程中/切换刚完成时，网卡可能短暂 Up/Down 抖动；这里直接忽略，避免“解锁→二次切换”
+      if (autoSwitchInFlight || (lastSwitchedAt && now - lastSwitchedAt < 15000)) {
+        lastEthernetStatus = currentStatus;
+        return;
+      }
+
+      // 网线状态变化：解锁，允许重新判断一次
+      autoSwitchLocked = false;
+      consecutiveCurrentFailures = 0;
       
       // 如果从断开变为连接，触发自动切换检查
       if (currentStatus) {
-        const now = Date.now();
         // 插网线过程中，网卡可能 Up/Down 抖动；这里做一次“事件冷却”，避免重复触发
         if (now - lastEthernetUpTriggerAt < AUTO_SWITCH_COOLDOWN_AFTER_ETHERNET_UP_MS) {
           lastEthernetStatus = currentStatus;
           return;
         }
         lastEthernetUpTriggerAt = now;
-        setTimeout(() => {
-          performAutoSwitch();
-        }, 2000); // 等待2秒让网络稳定
+
+        // 防抖：等待一段时间后再确认状态仍为 Up，避免瞬时抖动造成重复触发
+        pendingEthernetStatus = currentStatus;
+        if (ethernetStatusDebounceTimer) clearTimeout(ethernetStatusDebounceTimer);
+        ethernetStatusDebounceTimer = setTimeout(() => {
+          const snap = getTargetAdapterSnapshot();
+          const stillUp = !!snap?.is_enabled;
+          if (stillUp && pendingEthernetStatus === true) {
+            toggleByDhcpStatusOnPlug();
+          }
+          ethernetStatusDebounceTimer = null;
+          pendingEthernetStatus = null;
+        }, 3500); // 给 DHCP/路由/链路一点稳定时间
       }
     }
     
     lastEthernetStatus = currentStatus;
-  } else {
-    lastEthernetStatus = null;
   }
 }
 
@@ -264,6 +285,8 @@ async function performAutoSwitch() {
 
   const now = Date.now();
   if (autoSwitchInFlight) return;
+  // 一旦锁定（ping/连通性验证有效），除非再次拔插网线（以太网状态变化），否则不再做任何切换动作
+  if (autoSwitchLocked) return;
   if (now - lastAutoSwitchAt < AUTO_SWITCH_MIN_INTERVAL_MS) return;
   if (lastSwitchedAt && now - lastSwitchedAt < AUTO_SWITCH_COOLDOWN_AFTER_SWITCH_MS) return;
   if (lastFailureCooldownAt && now - lastFailureCooldownAt < AUTO_SWITCH_COOLDOWN_AFTER_FAILURE_MS) return;
@@ -290,19 +313,60 @@ async function performAutoSwitch() {
   const network2Config = normalizeNetworkConfig(autoSwitchConfig.network2, network2Defaults);
 
   try {
+    const adapterSnap = getTargetAdapterSnapshot();
+    const hasDhcp1 = network1Config.mode === 'dhcp';
+    const hasDhcp2 = network2Config.mode === 'dhcp';
+
+    // 优先级更高的一层保护：
+    // 只要目标网卡当前拿到了有效 DHCP IP（非 169.254.*），并且两侧配置中至少有一侧是 DHCP，
+    // 就直接将 currentActive 对齐到 DHCP 这一侧并锁定，完全禁止自动切到静态。
+    if (adapterSnap && isValidDhcpLease(adapterSnap) && (hasDhcp1 || hasDhcp2)) {
+      const preferSide = hasDhcp2 ? 'network2' : 'network1';
+      console.log('自动切换：检测到网卡当前为 DHCP 有效 IP，强制对齐到 DHCP 侧并锁定，禁止切到静态。', {
+        adapter: adapterSnap?.name,
+        ip: adapterSnap?.ip_address,
+        isDhcp: adapterSnap?.is_dhcp,
+        preferSide,
+      });
+
+      autoSwitchConfig = {
+        ...autoSwitchConfig,
+        network1: network1Config,
+        network2: network2Config,
+        currentActive: preferSide,
+      };
+      localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+
+      consecutiveCurrentFailures = 0;
+      lastCurrentOkAt = Date.now();
+      autoSwitchLocked = true;
+      autoSwitchLockedAt = Date.now();
+      return;
+    }
+
     const beforeActive = autoSwitchConfig.currentActive || 'network1';
+
+    // 策略约束：如果当前激活侧是 DHCP，且另一侧是静态，则永远不从当前侧自动切到静态。
+    // 典型场景：network1 = DHCP（外网），network2 = 静态 192.168.1.100（内网调试），
+    // 你希望“只要当前有正常 DHCP IP，就永远不切到静态”。
+    const currentIsNetwork2 = beforeActive === 'network2';
+    const currentCfgHard = currentIsNetwork2 ? network2Config : network1Config;
+    const otherCfgHard = currentIsNetwork2 ? network1Config : network2Config;
+    if (currentCfgHard.mode === 'dhcp' && otherCfgHard.mode === 'static') {
+      console.log('自动切换：命中策略保护，当前为 DHCP 且另一侧为静态，禁止自动切换到静态。', {
+        beforeActive,
+        currentMode: currentCfgHard.mode,
+        otherMode: otherCfgHard.mode,
+      });
+      consecutiveCurrentFailures = 0;
+      lastCurrentOkAt = Date.now();
+      autoSwitchLocked = true;
+      autoSwitchLockedAt = Date.now();
+      return;
+    }
 
     // 先只检测“当前侧”是否真的连续失败，避免短暂抖动导致误切
     const currentCfg = beforeActive === 'network2' ? network2Config : network1Config;
-
-    // 更“智能”的稳定信号：如果当前侧是 DHCP，并且网卡已拿到有效租约（非 169.254 + 有网关）
-    // 则认为当前网络稳定，不因 ping 偶发抖动切走。
-    const adapterSnap = getTargetAdapterSnapshot();
-    if (currentCfg.mode === 'dhcp' && isValidDhcpLease(adapterSnap)) {
-      consecutiveCurrentFailures = 0;
-      lastCurrentOkAt = Date.now();
-      return;
-    }
 
     const currentOk = await pingWithRetries(currentCfg.pingTarget, 2, 2, 400);
     if (currentOk) {
@@ -338,7 +402,8 @@ async function performAutoSwitch() {
     localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
 
     // 切换成功后进入冷却期，避免网络恢复/抖动导致马上切回
-    if (result?.result === 'switched' && activeNetwork !== beforeActive) {
+    // 注意：beforeActive 可能因为用户手动切换/重启等原因不准，因此只要后端判定 switched 就冷却
+    if (result?.result === 'switched') {
       lastSwitchedAt = Date.now();
     }
     // 两侧都失败：不要每 30s/事件触发就疯狂重试，退避一段时间
@@ -347,6 +412,12 @@ async function performAutoSwitch() {
     }
     // 一旦走到这里（已尝试切换/保持），重置连续失败计数，避免下一轮直接再次触发
     consecutiveCurrentFailures = 0;
+
+    // 你希望的策略：一旦验证有效就锁定，直到下一次拔插网线
+    if (result?.result === 'stay' || result?.result === 'switched') {
+      autoSwitchLocked = true;
+      autoSwitchLockedAt = Date.now();
+    }
     
     let trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
     if (result?.result === 'both_failed') {
@@ -372,21 +443,118 @@ async function performAutoSwitch() {
   }
 }
 
-// 启动自动切换
+// 按“当前是否为 DHCP”在两套配置之间切换（仅在拔插网线后调用一次）
+async function toggleByDhcpStatusOnPlug() {
+  if (!autoSwitchConfig || !autoSwitchConfig.enabled) {
+    return;
+  }
+
+  const adapterSnap = getTargetAdapterSnapshot();
+  if (!adapterSnap) return;
+
+  const adapterName = autoSwitchConfig.adapterName;
+
+  const network1Defaults = {
+    mode: 'dhcp',
+    dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+    staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+    pingTarget: 'baidu.com',
+    trayColor: '#00FF00'
+  };
+  const network2Defaults = {
+    mode: 'static',
+    dhcp: { dns: [] },
+    staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
+    pingTarget: '172.16.1.254',
+    trayColor: '#FFA500'
+  };
+
+  const network1Config = normalizeNetworkConfig(autoSwitchConfig.network1, network1Defaults);
+  const network2Config = normalizeNetworkConfig(autoSwitchConfig.network2, network2Defaults);
+
+  // 根据配置自动识别“哪侧是 DHCP，哪侧是静态”
+  const dhcpSide = network1Config.mode === 'dhcp' ? 'network1' : (network2Config.mode === 'dhcp' ? 'network2' : null);
+  const staticSide = network1Config.mode === 'static' ? 'network1' : (network2Config.mode === 'static' ? 'network2' : null);
+
+  if (!dhcpSide || !staticSide) {
+    console.warn('自动切换：未检测到一侧 DHCP + 一侧静态 的配置，跳过本次拔插切换。', {
+      network1Mode: network1Config.mode,
+      network2Mode: network2Config.mode,
+    });
+    return;
+  }
+
+  const dhcpCfg = dhcpSide === 'network1' ? network1Config : network2Config;
+  const staticCfg = staticSide === 'network1' ? network1Config : network2Config;
+
+  try {
+    if (adapterSnap.is_dhcp) {
+      // 当前为 DHCP → 按配置切到静态侧
+      if (!staticCfg.staticConfig) {
+        console.warn('自动切换：静态侧缺少 staticConfig，无法切换到静态。', { staticSide });
+        return;
+      }
+
+      console.log('自动切换：检测到当前为 DHCP，准备切换到静态侧。', {
+        adapter: adapterName,
+        from: dhcpSide,
+        to: staticSide,
+        staticCfg: staticCfg.staticConfig,
+      });
+
+      await invoke('set_static_ip', {
+        adapterName,
+        ip: staticCfg.staticConfig.ip,
+        subnet: staticCfg.staticConfig.subnet,
+        gateway: staticCfg.staticConfig.gateway,
+        dns: staticCfg.staticConfig.dns || [],
+      });
+
+      autoSwitchConfig = {
+        ...autoSwitchConfig,
+        network1: network1Config,
+        network2: network2Config,
+        currentActive: staticSide,
+      };
+      localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+    } else {
+      // 当前为静态 → 按配置切到 DHCP 侧
+      console.log('自动切换：检测到当前为静态，准备切换到 DHCP 侧。', {
+        adapter: adapterName,
+        from: staticSide,
+        to: dhcpSide,
+      });
+
+      await invoke('set_dhcp', { adapterName });
+
+      if (Array.isArray(dhcpCfg.dhcp?.dns) && dhcpCfg.dhcp.dns.length > 0) {
+        await invoke('set_dns_servers', {
+          adapterName,
+          dns: dhcpCfg.dhcp.dns,
+        });
+      }
+
+      autoSwitchConfig = {
+        ...autoSwitchConfig,
+        network1: network1Config,
+        network2: network2Config,
+        currentActive: dhcpSide,
+      };
+      localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+    }
+
+    // 切完后刷新一次网卡信息
+    await refreshNetworkInfo(false, { skipRender: true });
+  } catch (error) {
+    console.error('自动切换（拔插网线）执行失败:', error);
+  }
+}
+
+// 启动自动切换（仅启用“拔插网线触发”，不做定时轮询和初始化切换）
 export function startAutoSwitch() {
   if (autoSwitchInterval) {
     clearInterval(autoSwitchInterval);
   }
-  
-  // 延迟执行一次：给网卡状态/路由表一点稳定时间，减少“刚启用就误判切换”
-  setTimeout(() => {
-    performAutoSwitch();
-  }, 1500);
-  
-  // 每30秒检查一次（作为保险机制）
-  autoSwitchInterval = setInterval(() => {
-    performAutoSwitch();
-  }, 30000);
 }
 
 // 停止自动切换
