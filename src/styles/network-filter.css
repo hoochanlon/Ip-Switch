@@ -30,7 +30,7 @@
 
 .network-filter-input:focus {
   outline: none;
-  border-color: var(--btn-primary-bg);
+  border-color: var(--selected-color);
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
@@ -139,7 +139,7 @@
 }
 
 [data-theme="dark"] .network-filter-input:focus {
-  border-color: var(--btn-primary-bg);
+  border-color: var(--selected-color);
 }
 
 /* 响应式：小屏幕时调整筛选框宽度 */

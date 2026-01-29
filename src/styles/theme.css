@@ -20,6 +20,9 @@
   --btn-ghost-bg: #f3f4f6;
   --btn-ghost-hover: #eef2f7;
   
+  --selected-color: #667eea;
+  --selected-hover: #5a67d8;
+  
   --status-online: #10b981;
   --status-offline: #ef4444;
   --wifi-border: #10b981;
@@ -45,6 +48,9 @@
   --btn-secondary-hover: #334155;
   --btn-ghost-bg: #334155;
   --btn-ghost-hover: #475569;
+  
+  --selected-color: #667eea;
+  --selected-hover: #5a67d8;
   
   --status-online: #10b981;
   --status-offline: #ef4444;

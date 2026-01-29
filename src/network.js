@@ -620,6 +620,21 @@ function renderFullMode(container) {
     const isCableUnplugged = mediaStatus === 'upmediadisconnected' || mediaStatus === 'disconnected';
     const isActuallyDisabled = !adapter.is_enabled && !isCableUnplugged;
     
+    // 构建状态徽章：未连接时显示"已禁用"或"网线已拔出"在左边，然后是"未连接"
+    let statusBadgeHtml = '';
+    if (adapter.is_enabled) {
+      statusBadgeHtml = `<span class="status-badge enabled">${status}</span>`;
+    } else {
+      // 未连接时，根据 media_status 显示不同的状态
+      if (isCableUnplugged) {
+        // 网线已拔出：红色
+        statusBadgeHtml = `<span class="status-badge cable-unplugged">${t('mediaStateDisconnected')}</span> <span class="status-badge disabled">${status}</span>`;
+      } else {
+        // 已禁用：黄色
+        statusBadgeHtml = `<span class="status-badge disabled-yellow">${t('mediaStateDisabled')}</span> <span class="status-badge disabled">${status}</span>`;
+      }
+    }
+    
     const toggleLabel = adapter.is_enabled ? t('disableAdapter') : (isCableUnplugged ? '' : t('enableAdapter'));
     const toggleAction = adapter.is_enabled ? 'disable' : (isCableUnplugged ? '' : 'enable');
     const toggleBtnClass = adapter.is_enabled
@@ -637,7 +652,9 @@ function renderFullMode(container) {
             ${typeInfo.label}
           </span>
         </div>
-        <span class="status-badge ${adapter.is_enabled ? 'enabled' : 'disabled'}">${status}</span>
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+          ${statusBadgeHtml}
+        </div>
       </div>
       <div class="network-details">
         <div class="detail-row">
@@ -731,12 +748,24 @@ export function updateNetworkInfoStatsView() {
     const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
     const status = adapter.is_enabled ? t('connected') : t('disconnected');
 
-    // 状态徽章
-    const statusBadge = card.querySelector('.status-badge');
-    if (statusBadge) {
-      statusBadge.textContent = status;
-      statusBadge.classList.toggle('enabled', !!adapter.is_enabled);
-      statusBadge.classList.toggle('disabled', !adapter.is_enabled);
+    // 状态徽章：需要重新构建整个状态徽章区域
+    const statusBadgeContainer = card.querySelector('.network-header > div:last-child');
+    if (statusBadgeContainer) {
+      let statusBadgeHtml = '';
+      if (adapter.is_enabled) {
+        statusBadgeHtml = `<span class="status-badge enabled">${status}</span>`;
+      } else {
+        const mediaStatus = (adapter.media_status || '').toLowerCase();
+        const isCableUnplugged = mediaStatus === 'upmediadisconnected' || mediaStatus === 'disconnected';
+        if (isCableUnplugged) {
+          // 网线已拔出：红色
+          statusBadgeHtml = `<span class="status-badge cable-unplugged">${t('mediaStateDisconnected')}</span> <span class="status-badge disabled">${status}</span>`;
+        } else {
+          // 已禁用：黄色
+          statusBadgeHtml = `<span class="status-badge disabled-yellow">${t('mediaStateDisabled')}</span> <span class="status-badge disabled">${status}</span>`;
+        }
+      }
+      statusBadgeContainer.innerHTML = statusBadgeHtml;
     }
 
     // 顶部类型徽章（图标和文字）

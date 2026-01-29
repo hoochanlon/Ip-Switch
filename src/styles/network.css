@@ -108,6 +108,46 @@
   background: #ef4444;
 }
 
+/* 已禁用状态（黄色） */
+.status-badge.disabled-yellow {
+  background: #fef3c7;
+  color: #92400e;
+  position: relative;
+  padding-left: 20px;
+}
+
+.status-badge.disabled-yellow::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+/* 网线已拔出状态（红色） */
+.status-badge.cable-unplugged {
+  background: #fee2e2;
+  color: #991b1b;
+  position: relative;
+  padding-left: 20px;
+}
+
+.status-badge.cable-unplugged::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
 .network-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -178,8 +218,8 @@
 }
 
 .network-type-badge.ethernet {
-  background: #fff4e6;
-  color: #cc6600;
+  background: #e6f0ff;
+  color: #0066cc;
 }
 
 .network-type-badge.bluetooth {
@@ -203,7 +243,7 @@
 }
 
 .ethernet-card {
-  border-left: 4px solid #cc6600;
+  border-left: 4px solid #0066cc;
 }
 
 .bluetooth-card {

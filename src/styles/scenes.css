@@ -7,8 +7,8 @@
 }
 
 .auto-switch-control.enabled {
-  border-color: var(--btn-primary-bg);
-  box-shadow: 0 0 0 1px rgba(72, 187, 120, 0.4);
+  border-color: var(--selected-color);
+  box-shadow: 0 0 0 1px rgba(102, 126, 234, 0.4);
 }
 
 .auto-switch-control .checkbox-label {
@@ -39,11 +39,11 @@
 }
 
 .scene-item:hover {
-  border-color: var(--btn-primary-bg);
+  border-color: var(--selected-color);
 }
 
 .scene-item.active {
-  border-color: var(--btn-primary-bg);
+  border-color: var(--selected-color);
   background: var(--bg-tertiary);
 }
 
