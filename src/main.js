@@ -239,33 +239,56 @@ export async function checkNetworkStatusWithBackend() {
     // 如果前端检测为在线，或者有实际连接的网卡，就不显示红色
     if (allMainAdaptersDisconnected && !frontendStatus) {
       // 以太网和WiFi都断开，且前端检测也为离线，设置为红色
+      // 在设置为红色之前，先保存当前颜色（如果还没有保存的话）
+      if (!state.getLastTrayColor()) {
+        // 优先检查当前场景的颜色
+        if (state.currentScene) {
+          const scene = state.scenes.find(s => s.name === state.currentScene);
+          if (scene && scene.tray_color) {
+            state.setLastTrayColor(scene.tray_color);
+          } else {
+            // 如果没有场景颜色，使用默认蓝色
+            state.setLastTrayColor('#3366FF');
+          }
+        } else {
+          // 没有场景，使用默认蓝色
+          state.setLastTrayColor('#3366FF');
+        }
+      }
       try {
         await invoke('update_tray_icon_color', { hexColor: '#FF0000' });
       } catch (error) {
         console.warn('更新托盘图标为红色失败:', error);
       }
     } else {
-      // 网络恢复，恢复场景颜色或原色调
-      const lastColor = state.getLastTrayColor();
-      if (lastColor) {
-        try {
-          await invoke('update_tray_icon_color', { hexColor: lastColor });
-        } catch (error) {
-          console.warn('恢复托盘图标颜色失败:', error);
+      // 网络恢复，优先使用场景颜色，其次使用保存的颜色
+      let colorToRestore = null;
+      
+      // 优先检查当前场景的颜色
+      if (state.currentScene) {
+        const scene = state.scenes.find(s => s.name === state.currentScene);
+        if (scene && scene.tray_color) {
+          colorToRestore = scene.tray_color;
+          // 更新保存的颜色，确保下次恢复时使用场景颜色
+          state.setLastTrayColor(scene.tray_color);
         }
-      } else {
-        // 如果没有保存的颜色，检查当前场景是否有颜色设置
-        if (state.currentScene) {
-          const scene = state.scenes.find(s => s.name === state.currentScene);
-          if (scene && scene.tray_color) {
-            try {
-              await invoke('update_tray_icon_color', { hexColor: scene.tray_color });
-              state.setLastTrayColor(scene.tray_color);
-            } catch (error) {
-              console.warn('应用场景托盘颜色失败:', error);
-            }
-          }
-        }
+      }
+      
+      // 如果没有场景颜色，使用保存的颜色
+      if (!colorToRestore) {
+        colorToRestore = state.getLastTrayColor();
+      }
+      
+      // 如果还是没有颜色，使用默认蓝色
+      if (!colorToRestore) {
+        colorToRestore = '#3366FF';
+        state.setLastTrayColor(colorToRestore);
+      }
+      
+      try {
+        await invoke('update_tray_icon_color', { hexColor: colorToRestore });
+      } catch (error) {
+        console.warn('恢复托盘图标颜色失败:', error);
       }
     }
     

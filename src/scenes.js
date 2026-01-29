@@ -599,26 +599,42 @@ window.restoreScene = async function() {
     return;
   }
   
+  // 立即更新UI状态，让用户看到即时反馈
+  state.setCurrentScene(null);
+  renderScenes(); // 不等待，立即更新场景列表
+  
+  // 恢复托盘颜色为默认蓝色（立即执行，不等待后端操作）
+  const defaultColor = '#3366FF';
+  invoke('update_tray_icon_color', { hexColor: defaultColor }).then(() => {
+    state.setLastTrayColor(defaultColor);
+  }).catch(error => {
+    console.warn('恢复托盘图标颜色失败:', error);
+  });
+  
+  // 异步执行恢复操作，不阻塞UI
   try {
-    await invoke('restore_backup');
+    // 后台执行恢复操作
+    const restorePromise = invoke('restore_backup');
     
-    // 清除当前场景状态
-    state.setCurrentScene(null);
+    // 等待恢复完成
+    await restorePromise;
     
-    // 恢复托盘颜色为默认蓝色
-    const defaultColor = '#3366FF';
-    try {
-      await invoke('update_tray_icon_color', { hexColor: defaultColor });
-      state.setLastTrayColor(defaultColor);
-    } catch (error) {
-      console.warn('恢复托盘图标颜色失败:', error);
-    }
+    // 等待一下，让Windows系统有时间应用网络配置
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    await renderScenes();
-    await updateStatusIndicator(); // 更新状态指示器
-    await refreshNetworkInfo();
+    // 更新状态指示器（不等待网络信息刷新，避免响应缓慢）
+    await updateStatusIndicator();
+    
+    // 异步刷新网络信息，不阻塞UI响应
+    refreshNetworkInfo(false, { skipRender: true }).catch(error => {
+      console.warn('刷新网络信息失败:', error);
+    });
+    
     alert(t('restoreSceneOk'));
   } catch (error) {
     alert(t('restoreSceneFailed', { error }));
+    // 如果失败，重新渲染以恢复状态
+    await renderScenes();
+    await updateStatusIndicator();
   }
 };
