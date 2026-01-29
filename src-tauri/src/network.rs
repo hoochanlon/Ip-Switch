@@ -886,7 +886,8 @@ pub async fn auto_switch_network(
 ) -> Result<AutoSwitchResult, String> {
     // 先探测当前网卡是否存在
     let current_info = get_network_info().await?;
-    let _ = current_info.iter()
+    let _ = current_info
+        .iter()
         .find(|a| a.name == adapter_name)
         .ok_or_else(|| format!("找不到网卡: {}", adapter_name))?;
 
@@ -898,24 +899,48 @@ pub async fn auto_switch_network(
     };
 
     // 1. 先检测当前侧（指定网卡发包 + 多次 ping，降低瞬时抖动/默认路由误判）
-    let current_ok = ping_test_on_adapter_with_retries(&adapter_name, &current_cfg.ping_target, 3, 2, 500).await;
+    //    注意：这里不强制重配当前侧，而是基于现状做连通性判断，
+    //    只有在当前侧不可用时才真正切到另一侧，避免“来回切换”的视觉抖动。
+    let current_ok = ping_test_on_adapter_with_retries(
+        &adapter_name,
+        &current_cfg.ping_target,
+        3,
+        2,
+        500,
+    )
+    .await;
     if current_ok {
         return Ok(AutoSwitchResult {
             message: format!("保持{} (连接正常)", current_label),
-            active_network: if active == "network2" { "network2".to_string() } else { "network1".to_string() },
+            active_network: if active == "network2" {
+                "network2".to_string()
+            } else {
+                "network1".to_string()
+            },
             result: "stay".to_string(),
         });
     }
 
-    // 2. 切换到另一侧并检测
+    // 2. 当前侧不通，才切换到另一侧并检测
     apply_network_config(&adapter_name, &other_cfg).await?;
     // 等待配置生效/路由就绪后再 ping
     wait_adapter_ready(&adapter_name, &other_cfg).await;
-    let other_ok = ping_test_on_adapter_with_retries(&adapter_name, &other_cfg.ping_target, 3, 2, 500).await;
+    let other_ok = ping_test_on_adapter_with_retries(
+        &adapter_name,
+        &other_cfg.ping_target,
+        3,
+        2,
+        500,
+    )
+    .await;
     if other_ok {
         return Ok(AutoSwitchResult {
             message: format!("已切换到{} (原{}不可用)", other_label, current_label),
-            active_network: if active == "network2" { "network1".to_string() } else { "network2".to_string() },
+            active_network: if active == "network2" {
+                "network1".to_string()
+            } else {
+                "network2".to_string()
+            },
             result: "switched".to_string(),
         });
     }
@@ -923,8 +948,15 @@ pub async fn auto_switch_network(
     // 3. 两侧都不通，回退到原侧
     let _ = apply_network_config(&adapter_name, &current_cfg).await;
     Ok(AutoSwitchResult {
-        message: format!("异常：{} 与 {} 都无法ping通，已回退到{}", current_label, other_label, current_label),
-        active_network: if active == "network2" { "network2".to_string() } else { "network1".to_string() },
+        message: format!(
+            "异常：{} 与 {} 都无法ping通，已回退到{}",
+            current_label, other_label, current_label
+        ),
+        active_network: if active == "network2" {
+            "network2".to_string()
+        } else {
+            "network1".to_string()
+        },
         result: "both_failed".to_string(),
     })
 }

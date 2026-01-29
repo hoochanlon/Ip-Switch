@@ -11,6 +11,8 @@ import { buildAutoSwitchModalHtml } from './auto-switch-template.js';
 let autoSwitchConfig = null;
 let lastEthernetStatus = null;
 let autoSwitchInFlight = false;
+// 一次“拔插循环”中，只在成功选择 DHCP/静态后锁定，直到再次检测到网线被拔掉才解锁
+let autoSwitchLocked = false;
 let ethernetStatusDebounceTimer = null;
 let pendingEthernetStatus = null;
 
@@ -237,6 +239,14 @@ function checkEthernetStatusChange() {
         return;
       }
 
+      // 当检测到“由连通变为断开”时，只解锁，不做任何网络配置变更
+      if (!currentStatus) {
+        console.debug('[auto-switch] 以太网断开，解锁自动切换；下次插入时允许重新判定 DHCP/静态。', {
+          adapter: target.name,
+        });
+        autoSwitchLocked = false;
+      }
+
       // 如果从断开变为连接，触发自动切换检查
       if (currentStatus) {
         // 简单防抖：等待一段时间后再确认状态仍为 Up，避免瞬时抖动造成重复触发
@@ -275,6 +285,13 @@ function normalizeNetworkConfig(cfg, defaults) {
 async function performAutoSwitch() {
   if (!autoSwitchConfig || !autoSwitchConfig.enabled) {
     console.debug('[auto-switch] performAutoSwitch 跳过：未启用或无配置');
+    return;
+  }
+
+  // 一次“拔插循环”内，一旦已经根据 ping -S 选定了 DHCP/静态，就不再重复判定，
+  // 直到检测到网线被拔掉（上面的 checkEthernetStatusChange 会解锁）。
+  if (autoSwitchLocked) {
+    console.debug('[auto-switch] performAutoSwitch 跳过：当前处于锁定状态（等待下一次拔插网线）');
     return;
   }
 
@@ -331,6 +348,11 @@ async function performAutoSwitch() {
       currentActive: activeNetwork
     };
     localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+
+    // 只要后端给出的结果是“保持当前”或“已切换成功”，视为本次 DHCP/静态选择已完成，锁定到下次拔插网线。
+    if (result?.result === 'stay' || result?.result === 'switched') {
+      autoSwitchLocked = true;
+    }
 
     let trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
     if (result?.result === 'both_failed') {
