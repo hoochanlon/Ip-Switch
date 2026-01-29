@@ -318,17 +318,54 @@ pub fn hex_to_rgba(hex: &str) -> Result<(f32, f32, f32, f32), String> {
     }
 }
 
+/// 计算颜色的相对亮度（W3C标准）
+/// 返回值范围: 0.0 (最暗) 到 1.0 (最亮)
+/// 用于判断背景颜色是亮色还是暗色，从而决定文字颜色
+fn calculate_luminance(r: f32, g: f32, b: f32) -> f32 {
+    // W3C 相对亮度公式
+    // 需要先进行 gamma 校正
+    let to_linear = |c: f32| {
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    
+    let r_linear = to_linear(r);
+    let g_linear = to_linear(g);
+    let b_linear = to_linear(b);
+    
+    // 相对亮度权重
+    0.2126 * r_linear + 0.7152 * g_linear + 0.0722 * b_linear
+}
+
+/// 根据背景颜色自动选择文字颜色
+/// 如果背景较亮（luminance > 0.5），返回黑色；否则返回白色
+fn get_contrast_text_color(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    let luminance = calculate_luminance(r, g, b);
+    // 阈值 0.5：如果背景亮度 > 0.5，使用黑色文字；否则使用白色文字
+    if luminance > 0.5 {
+        (0.0, 0.0, 0.0) // 黑色
+    } else {
+        (1.0, 1.0, 1.0) // 白色
+    }
+}
+
 /// 更新托盘图标颜色（Tauri command）
 #[tauri::command]
 pub async fn update_tray_icon_color(app: tauri::AppHandle, hex_color: &str) -> Result<(), String> {
     // 解析十六进制颜色
     let (r, g, b, a) = hex_to_rgba(hex_color)?;
     
+    // 根据背景颜色自动选择文字颜色（确保对比度）
+    let (text_r, text_g, text_b) = get_contrast_text_color(r, g, b);
+    
     // 生成新图标
     let icon = TrayIconGenerator::new()
         .with_size(32)
         .with_background_color(r, g, b, a)
-        .with_text_color(1.0, 1.0, 1.0, 1.0) // 文字保持白色
+        .with_text_color(text_r, text_g, text_b, 1.0) // 根据背景自动选择文字颜色
         .generate()
         .map_err(|e| format!("生成托盘图标失败: {}", e))?;
     
