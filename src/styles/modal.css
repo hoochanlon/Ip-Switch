@@ -41,8 +41,8 @@
 }
 
 .auto-switch-modal {
-  max-width: 600px;
-  max-height: 85vh;
+  max-width: 1000px;
+  max-height: 90vh;
 }
 
 /* 自动切换弹窗内的表单组间距更紧凑 */

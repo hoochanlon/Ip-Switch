@@ -39,7 +39,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
   };
 
   return `
-    <div class="modal-content auto-switch-modal" style="max-width: 600px;">
+    <div class="modal-content auto-switch-modal" style="max-width: 1000px;">
       <div class="modal-header">
         <h2>${t('autoSwitchConfigTitle')}</h2>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
