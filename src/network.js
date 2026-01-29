@@ -5,12 +5,32 @@ import * as state from './state.js';
 import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 
+function buildNetworkSignature(list) {
+  if (!Array.isArray(list)) return '';
+  // 只用“会影响用户感知的状态”做签名：启用状态 / DHCP / IP / 网关 / DNS
+  return list
+    .map((a) => {
+      const dns = Array.isArray(a.dns_servers) ? a.dns_servers.join('|') : '';
+      return [
+        a.name || '',
+        a.network_type || '',
+        a.is_enabled ? '1' : '0',
+        a.is_dhcp ? '1' : '0',
+        a.ip_address || '',
+        a.gateway || '',
+        dns,
+      ].join('~');
+    })
+    .sort()
+    .join('||');
+}
+
 // 刷新网络信息
 // showLoading: 是否显示加载提示（默认 false，静默刷新）
 // options:
 //   - skipRender: 仅更新状态，不重新渲染 DOM，避免界面“闪一下”
 export async function refreshNetworkInfo(showLoading = false, options = {}) {
-  const { skipRender = false } = options;
+  const { skipRender = false, smartRender = false } = options;
   const container = document.getElementById('network-info');
   
   // 只在需要显示加载提示时才清空内容
@@ -19,6 +39,8 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
   }
   
   try {
+    const prevInfo = state.currentNetworkInfo;
+    const prevSig = buildNetworkSignature(prevInfo);
     state.setCurrentNetworkInfo(await invoke('get_network_info'));
     console.log('获取到的网络信息:', state.currentNetworkInfo);
     
@@ -64,7 +86,9 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
     }
 
     // 渲染列表（允许调用方选择跳过渲染，避免自动刷新导致选中卡片闪烁）
-    if (!skipRender) {
+    const nextSig = buildNetworkSignature(state.currentNetworkInfo);
+    const shouldRerender = prevSig !== nextSig;
+    if (!skipRender || (smartRender && shouldRerender)) {
       renderNetworkInfo();
     } else if (container && container.children.length > 0) {
       // 已经有列表时，做一次“就地更新”而非整体重绘，让统计数据仍然实时变化

@@ -80,6 +80,33 @@ async function init() {
   
   // 初始化网络筛选功能
   initNetworkFilter();
+
+  // 后台定期刷新网卡信息：确保插拔网线/切换 Wi‑Fi 后能“实时反馈”
+  // - smartRender: 只有关键字段变化才触发重绘，避免界面闪烁
+  startNetworkInfoAutoRefresh();
+}
+
+let networkInfoAutoRefreshTimer = null;
+function startNetworkInfoAutoRefresh() {
+  if (networkInfoAutoRefreshTimer) clearInterval(networkInfoAutoRefreshTimer);
+
+  const tick = () => {
+    // 静默刷新：不打断用户操作，但如果网卡状态变化会 smart render
+    refreshNetworkInfo(false, { skipRender: true, smartRender: true });
+  };
+
+  // 启动后先来一次
+  setTimeout(tick, 1200);
+  // 之后每 3 秒刷新一次（足够实时，但不会过度占用）
+  networkInfoAutoRefreshTimer = setInterval(tick, 3000);
+
+  // 浏览器 online/offline 事件也来一把“立即刷新”，提高感知速度
+  try {
+    window.addEventListener('online', () => tick());
+    window.addEventListener('offline', () => tick());
+  } catch {
+    // ignore
+  }
 }
 
 // 初始化网络状态检测

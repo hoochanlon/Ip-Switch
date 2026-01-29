@@ -614,6 +614,17 @@ pub async fn set_static_ip(
 
 #[tauri::command]
 pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
+    // 先移除默认网关路由（避免从静态/旧配置残留 0.0.0.0/0 NextHop，导致“DHCP 了网关还显示旧值”）
+    let _ = powershell_cmd()
+        .args(&[
+            "-Command",
+            &format!(
+                "$adapter = Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue; if ($adapter) {{ $routes = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue; if ($routes) {{ $routes | Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue }} }}",
+                adapter_name.replace("'", "''")
+            ),
+        ])
+        .output();
+
     // 移除现有IP配置（允许失败，因为可能没有现有IP）
     let _ = powershell_cmd()
         .args(&[
@@ -647,6 +658,17 @@ pub async fn set_dhcp(adapter_name: String) -> Result<(), String> {
                 "$adapter = Get-NetAdapter -Name '{}' -ErrorAction SilentlyContinue; if ($adapter) {{ Set-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -ResetServerAddresses -ErrorAction SilentlyContinue }}",
                 adapter_name.replace("'", "''")
             )
+        ])
+        .output();
+
+    // 主动触发一次 DHCP 续租（某些环境下仅启用 DHCP 不会立刻刷新租约/路由）
+    let _ = powershell_cmd()
+        .args(&[
+            "-Command",
+            &format!(
+                "$name = '{}'; ipconfig /renew \"$name\" | Out-Null",
+                adapter_name.replace("'", "''")
+            ),
         ])
         .output();
 
@@ -696,6 +718,145 @@ pub async fn ping_test(host: String, timeout_sec: u64) -> Result<bool, String> {
     Ok(output_str.contains("SUCCESS"))
 }
 
+/// 多次 ping（任意一次成功即视为可用），用于降低短暂抖动/解析延迟导致的误判。
+async fn ping_test_with_retries(host: &str, timeout_sec: u64, attempts: u32, delay_ms: u64) -> bool {
+    let tries = attempts.max(1);
+    for i in 0..tries {
+        let ok = ping_test(host.to_string(), timeout_sec).await.unwrap_or(false);
+        if ok {
+            return true;
+        }
+        // 最后一次不必再等待
+        if i + 1 < tries {
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+        }
+    }
+    false
+}
+
+/// 尽量使用指定网卡的 IPv4 作为 Source 进行 ping，避免系统默认路由（例如 Wi‑Fi）导致“以太网配置错了也能 ping 通”的误判。
+async fn ping_test_on_adapter(adapter_name: &str, host: &str, timeout_sec: u64) -> bool {
+    let (ip, _) = match get_ipv4_and_gateway(adapter_name).await {
+        Ok(v) => v,
+        Err(_) => (None, None),
+    };
+
+    // 没有可用 IPv4 时回退到普通 ping
+    let src_ip = match ip {
+        Some(v) if !v.trim().is_empty() => v,
+        _ => return ping_test(host.to_string(), timeout_sec).await.unwrap_or(false),
+    };
+
+    let output = powershell_cmd()
+        .args(&[
+            "-Command",
+            &format!(
+                "$result = Test-Connection -ComputerName '{}' -Source '{}' -Count 1 -Quiet -TimeoutSeconds {}; if ($result) {{ Write-Output 'SUCCESS' }} else {{ Write-Output 'FAILED' }}",
+                host.replace("'", "''"),
+                src_ip.replace("'", "''"),
+                timeout_sec
+            ),
+        ])
+        .output();
+
+    match output {
+        Ok(out) => {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            s.contains("SUCCESS")
+        }
+        Err(_) => false,
+    }
+}
+
+async fn ping_test_on_adapter_with_retries(
+    adapter_name: &str,
+    host: &str,
+    timeout_sec: u64,
+    attempts: u32,
+    delay_ms: u64,
+) -> bool {
+    let tries = attempts.max(1);
+    for i in 0..tries {
+        let ok = ping_test_on_adapter(adapter_name, host, timeout_sec).await;
+        if ok {
+            return true;
+        }
+        if i + 1 < tries {
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+        }
+    }
+    false
+}
+
+/// 读取指定网卡的 IPv4 地址与默认网关（0.0.0.0/0 NextHop）
+async fn get_ipv4_and_gateway(adapter_name: &str) -> Result<(Option<String>, Option<String>), String> {
+    let safe_name = adapter_name.replace("'", "''");
+    // IMPORTANT: 这里不要用 `format!`，否则 PowerShell 的 `{}` 会被 Rust 当作格式化占位符解析导致编译失败。
+    let script = r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+      $adapter = Get-NetAdapter -Name '{ADAPTER}' -ErrorAction SilentlyContinue;
+      if (-not $adapter) { '{"ip":null,"gw":null}' } else {
+        $ip = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1;
+        $route = Get-NetRoute -InterfaceIndex $adapter.ifIndex -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Select-Object -First 1;
+        $obj = @{ ip = if ($ip) { $ip.IPAddress } else { $null }; gw = if ($route) { $route.NextHop } else { $null } };
+        $obj | ConvertTo-Json -Compress
+      }"#.replace("{ADAPTER}", &safe_name);
+
+    let output = powershell_cmd()
+        .args(&[
+            "-Command",
+            &script,
+        ])
+        .output()
+        .map_err(|e| format!("读取网卡IP信息失败: {}", e))?;
+
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| format!("解析网卡IP信息失败: {} ({})", e, raw))?;
+    let ip = v.get("ip").and_then(|x| x.as_str()).map(|s| s.to_string());
+    let gw = v.get("gw").and_then(|x| x.as_str()).map(|s| s.to_string());
+    Ok((ip, gw))
+}
+
+/// 等待网卡在应用配置后进入“更稳定的可用状态”，避免 DHCP/路由未就绪就 ping 误判。
+async fn wait_adapter_ready(adapter_name: &str, cfg: &NetworkConfig) {
+    match cfg.mode.as_str() {
+        "dhcp" => {
+            // 最多等待约 15s：等到拿到非 169.254.* 的 IPv4 且存在默认网关
+            for _ in 0..15 {
+                if let Ok((ip, gw)) = get_ipv4_and_gateway(adapter_name).await {
+                    let ip_ok = ip.as_deref().is_some_and(|s| !s.starts_with("169.254."));
+                    let gw_ok = gw.as_deref().is_some_and(|s| s != "0.0.0.0");
+                    if ip_ok && gw_ok {
+                        break;
+                    }
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+        }
+        "static" => {
+            // 静态通常很快，但仍给系统一点时间更新路由/接口状态
+            let expected_ip = cfg
+                .static_config
+                .as_ref()
+                .map(|s| s.ip.as_str())
+                .unwrap_or("");
+            for _ in 0..10 {
+                if expected_ip.is_empty() {
+                    break;
+                }
+                if let Ok((ip, _)) = get_ipv4_and_gateway(adapter_name).await {
+                    if ip.as_deref() == Some(expected_ip) {
+                        break;
+                    }
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+            }
+        }
+        _ => {
+            // ignore
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkConfig {
@@ -735,8 +896,8 @@ pub async fn auto_switch_network(
         ("网络1", "网络2", network1_config.clone(), network2_config.clone())
     };
 
-    // 1. 先检测当前侧
-    let current_ok = ping_test(current_cfg.ping_target.clone(), 3).await.unwrap_or(false);
+    // 1. 先检测当前侧（指定网卡发包 + 多次 ping，降低瞬时抖动/默认路由误判）
+    let current_ok = ping_test_on_adapter_with_retries(&adapter_name, &current_cfg.ping_target, 3, 2, 500).await;
     if current_ok {
         return Ok(AutoSwitchResult {
             message: format!("保持{} (连接正常)", current_label),
@@ -747,7 +908,9 @@ pub async fn auto_switch_network(
 
     // 2. 切换到另一侧并检测
     apply_network_config(&adapter_name, &other_cfg).await?;
-    let other_ok = ping_test(other_cfg.ping_target.clone(), 3).await.unwrap_or(false);
+    // 等待配置生效/路由就绪后再 ping
+    wait_adapter_ready(&adapter_name, &other_cfg).await;
+    let other_ok = ping_test_on_adapter_with_retries(&adapter_name, &other_cfg.ping_target, 3, 2, 500).await;
     if other_ok {
         return Ok(AutoSwitchResult {
             message: format!("已切换到{} (原{}不可用)", other_label, current_label),

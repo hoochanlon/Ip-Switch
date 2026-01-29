@@ -10,6 +10,57 @@ import { t } from './i18n.js';
 let autoSwitchConfig = null;
 let autoSwitchInterval = null;
 let lastEthernetStatus = null;
+let autoSwitchInFlight = false;
+let lastAutoSwitchAt = 0;
+let lastSwitchedAt = 0;
+let lastEthernetUpTriggerAt = 0;
+let lastFailureCooldownAt = 0;
+let consecutiveCurrentFailures = 0;
+let lastCurrentOkAt = 0;
+
+// 稳定性策略：避免网络抖动/切换生效延迟导致“来回切”
+const AUTO_SWITCH_MIN_INTERVAL_MS = 8000; // 最短触发间隔（避免事件风暴）
+const AUTO_SWITCH_COOLDOWN_AFTER_SWITCH_MS = 60000; // 切换成功后冷却时间
+const AUTO_SWITCH_COOLDOWN_AFTER_ETHERNET_UP_MS = 90000; // 插网线后只触发一次，避免网卡状态抖动反复触发
+const AUTO_SWITCH_COOLDOWN_AFTER_FAILURE_MS = 30000; // 两侧都失败/异常时，退避一段时间再重试
+const AUTO_SWITCH_FAILS_BEFORE_SWITCH = 2; // 连续失败达到阈值才允许切换（避免“先对后错”的误切）
+
+async function pingWithRetries(host, timeoutSec = 2, attempts = 2, delayMs = 400) {
+  const tries = Math.max(1, attempts);
+  for (let i = 0; i < tries; i++) {
+    try {
+      // 后端 ping_test: 返回 bool
+      const ok = await invoke('ping_test', { host, timeoutSec });
+      if (ok) return true;
+    } catch {
+      // ignore and retry
+    }
+    if (i + 1 < tries) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return false;
+}
+
+function getTargetAdapterSnapshot() {
+  const name = autoSwitchConfig?.adapterName;
+  if (!name) return null;
+  const list = state.currentNetworkInfo;
+  if (!Array.isArray(list)) return null;
+  return list.find((a) => a?.name === name) || null;
+}
+
+function isValidDhcpLease(adapter) {
+  if (!adapter) return false;
+  // 后端字段：is_dhcp / ip_address / gateway
+  if (!adapter.is_dhcp) return false;
+  const ip = String(adapter.ip_address || '').trim();
+  const gw = String(adapter.gateway || '').trim();
+  // DHCP 未拿到租约时常见：169.254.*（APIPA）+ 无网关
+  if (!ip || ip.startsWith('169.254.')) return false;
+  if (!gw || gw === '0.0.0.0') return false;
+  return true;
+}
 
 // 初始化自动切换功能
 export function initAutoSwitch() {
@@ -174,6 +225,13 @@ function checkEthernetStatusChange() {
       
       // 如果从断开变为连接，触发自动切换检查
       if (currentStatus) {
+        const now = Date.now();
+        // 插网线过程中，网卡可能 Up/Down 抖动；这里做一次“事件冷却”，避免重复触发
+        if (now - lastEthernetUpTriggerAt < AUTO_SWITCH_COOLDOWN_AFTER_ETHERNET_UP_MS) {
+          lastEthernetStatus = currentStatus;
+          return;
+        }
+        lastEthernetUpTriggerAt = now;
         setTimeout(() => {
           performAutoSwitch();
         }, 2000); // 等待2秒让网络稳定
@@ -203,6 +261,15 @@ async function performAutoSwitch() {
   if (!autoSwitchConfig || !autoSwitchConfig.enabled) {
     return;
   }
+
+  const now = Date.now();
+  if (autoSwitchInFlight) return;
+  if (now - lastAutoSwitchAt < AUTO_SWITCH_MIN_INTERVAL_MS) return;
+  if (lastSwitchedAt && now - lastSwitchedAt < AUTO_SWITCH_COOLDOWN_AFTER_SWITCH_MS) return;
+  if (lastFailureCooldownAt && now - lastFailureCooldownAt < AUTO_SWITCH_COOLDOWN_AFTER_FAILURE_MS) return;
+
+  autoSwitchInFlight = true;
+  lastAutoSwitchAt = now;
   
   const network1Defaults = {
     mode: 'dhcp',
@@ -223,6 +290,34 @@ async function performAutoSwitch() {
   const network2Config = normalizeNetworkConfig(autoSwitchConfig.network2, network2Defaults);
 
   try {
+    const beforeActive = autoSwitchConfig.currentActive || 'network1';
+
+    // 先只检测“当前侧”是否真的连续失败，避免短暂抖动导致误切
+    const currentCfg = beforeActive === 'network2' ? network2Config : network1Config;
+
+    // 更“智能”的稳定信号：如果当前侧是 DHCP，并且网卡已拿到有效租约（非 169.254 + 有网关）
+    // 则认为当前网络稳定，不因 ping 偶发抖动切走。
+    const adapterSnap = getTargetAdapterSnapshot();
+    if (currentCfg.mode === 'dhcp' && isValidDhcpLease(adapterSnap)) {
+      consecutiveCurrentFailures = 0;
+      lastCurrentOkAt = Date.now();
+      return;
+    }
+
+    const currentOk = await pingWithRetries(currentCfg.pingTarget, 2, 2, 400);
+    if (currentOk) {
+      consecutiveCurrentFailures = 0;
+      lastCurrentOkAt = Date.now();
+      return;
+    }
+
+    consecutiveCurrentFailures += 1;
+    // 还没达到阈值：不触发切换（下一轮再确认一次）
+    if (consecutiveCurrentFailures < AUTO_SWITCH_FAILS_BEFORE_SWITCH) {
+      return;
+    }
+
+    // 达到阈值后才允许调用后端执行“切换尝试”
     const result = await invoke('auto_switch_network', {
       adapterName: autoSwitchConfig.adapterName,
       currentActive: autoSwitchConfig.currentActive || 'network1',
@@ -241,6 +336,17 @@ async function performAutoSwitch() {
       currentActive: activeNetwork
     };
     localStorage.setItem('autoSwitchConfig', JSON.stringify(autoSwitchConfig));
+
+    // 切换成功后进入冷却期，避免网络恢复/抖动导致马上切回
+    if (result?.result === 'switched' && activeNetwork !== beforeActive) {
+      lastSwitchedAt = Date.now();
+    }
+    // 两侧都失败：不要每 30s/事件触发就疯狂重试，退避一段时间
+    if (result?.result === 'both_failed') {
+      lastFailureCooldownAt = Date.now();
+    }
+    // 一旦走到这里（已尝试切换/保持），重置连续失败计数，避免下一轮直接再次触发
+    consecutiveCurrentFailures = 0;
     
     let trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
     if (result?.result === 'both_failed') {
@@ -261,6 +367,8 @@ async function performAutoSwitch() {
     await refreshNetworkInfo(false, { skipRender: true });
   } catch (error) {
     console.error('自动切换失败:', error);
+  } finally {
+    autoSwitchInFlight = false;
   }
 }
 
@@ -270,8 +378,10 @@ export function startAutoSwitch() {
     clearInterval(autoSwitchInterval);
   }
   
-  // 立即执行一次
-  performAutoSwitch();
+  // 延迟执行一次：给网卡状态/路由表一点稳定时间，减少“刚启用就误判切换”
+  setTimeout(() => {
+    performAutoSwitch();
+  }, 1500);
   
   // 每30秒检查一次（作为保险机制）
   autoSwitchInterval = setInterval(() => {
