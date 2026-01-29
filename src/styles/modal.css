@@ -45,6 +45,45 @@
   max-height: 90vh;
 }
 
+/* 自动切换弹窗的两列布局 */
+.auto-switch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.auto-switch-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 两列内的表单组间距保持紧凑 */
+.auto-switch-column .form-group {
+  margin-bottom: 18px;
+}
+
+.auto-switch-column .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.auto-switch-column #network1-static-fields .form-group,
+.auto-switch-column #network2-static-fields .form-group {
+  margin-bottom: 14px;
+}
+
+.auto-switch-column #network1-static-fields .form-group:last-child,
+.auto-switch-column #network2-static-fields .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* 响应式：小屏幕时改为单列 */
+@media (max-width: 960px) {
+  .auto-switch-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 自动切换弹窗内的表单组间距更紧凑 */
 .auto-switch-modal .form-group {
   margin-bottom: 18px;
