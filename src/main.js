@@ -4,12 +4,12 @@ import { invoke } from '@tauri-apps/api/core';
 import NetworkStatus from './network-status.js';
 import { initTheme, toggleTheme } from './theme.js';
 import * as state from './state.js';
-import { refreshNetworkInfo, renderNetworkInfo, initNetworkFilter } from './network.js';
+import { refreshNetworkInfo, renderNetworkInfo, initNetworkFilter, startFastMediaStateWatcher } from './network.js';
 import { loadScenes, renderScenes } from './scenes.js';
 import { editHosts } from './hosts.js';
 import { editProxy } from './proxy.js';
 import { updateStatusIndicator, updateNetworkStatusUI, showAboutModal, closeAboutModal } from './ui.js';
-import { initAutoSwitch, showAutoSwitchConfig } from './auto-switch.js';
+import { initAutoSwitch, showAutoSwitchConfig, getAutoSwitchConfig } from './auto-switch.js';
 import { initHostsScheduledUpdate } from './hosts.js';
 import { initWindowControls, initWindowDrag } from './window-controls.js';
 import { initI18n, toggleLanguage, getLanguage, t } from './i18n.js';
@@ -84,6 +84,9 @@ async function init() {
   // 后台定期刷新网卡信息：确保插拔网线/切换 Wi‑Fi 后能“实时反馈”
   // - smartRender: 只有关键字段变化才触发重绘，避免界面闪烁
   startNetworkInfoAutoRefresh();
+
+  // 启动快速媒体状态监听：专门加速“媒体状态已启用/已禁用”这类轻量字段的刷新
+  startFastMediaStateWatcher();
 }
 
 let networkInfoAutoRefreshTimer = null;
@@ -96,10 +99,10 @@ function startNetworkInfoAutoRefresh() {
     refreshNetworkInfo(false, { skipRender: true, smartRender: true });
   };
 
-  // 启动后先来一次
-  setTimeout(tick, 1200);
-  // 之后每 3 秒刷新一次（足够实时，但不会过度占用）
-  networkInfoAutoRefreshTimer = setInterval(tick, 3000);
+  // 启动后先来一次（300ms 内刷新一次，接近系统托盘更新速度）
+  setTimeout(tick, 300);
+  // 之后每 1 秒刷新一次（网线插拔后 1s 内基本能反映到“媒体状态”）
+  networkInfoAutoRefreshTimer = setInterval(tick, 1000);
 
   // 浏览器 online/offline 事件也来一把“立即刷新”，提高感知速度
   try {
@@ -120,7 +123,8 @@ function initNetworkStatus() {
     if (state.isNetworkChanging) return null;
     const now = Date.now();
     if (pendingBackendRefresh) return pendingBackendRefresh;
-    if (now - lastBackendRefreshAt < 1000) return null;
+    // 缩短节流间隔到 500ms，使网卡状态变化更快反映到前端
+    if (now - lastBackendRefreshAt < 500) return null;
 
     lastBackendRefreshAt = now;
     // 后台静默刷新：仅更新状态，不重绘界面，避免网卡列表闪烁
@@ -143,6 +147,11 @@ function initNetworkStatus() {
 
 // 结合后端网络信息检查网络状态
 export async function checkNetworkStatusWithBackend() {
+  // 如果网络正在切换中（自动切换或场景应用），跳过颜色更新，避免覆盖
+  if (state.isNetworkChanging) {
+    return;
+  }
+  
   try {
     // 检查以太网和WiFi的状态
     let hasEnabledEthernet = false;
@@ -232,13 +241,30 @@ export async function checkNetworkStatusWithBackend() {
       }
     }
     
-    // 检查以太网和WiFi是否都断开（没有实际连接）
+    // 检查以太网和WiFi是否都断开（没有实际连接：启用但无有效 IPv4）
     const allMainAdaptersDisconnected = !hasConnectedEthernet && !hasConnectedWifi;
     
+    // 检查是否启用了自动切换，如果启用，优先使用自动切换的颜色，不覆盖
+    const autoSwitchConfig = getAutoSwitchConfig();
+    const isAutoSwitchEnabled = autoSwitchConfig && autoSwitchConfig.enabled;
+    
     // 更新托盘图标颜色
-    // 如果前端检测为在线，或者有实际连接的网卡，就不显示红色
-    if (allMainAdaptersDisconnected && !frontendStatus) {
-      // 以太网和WiFi都断开，且前端检测也为离线，设置为红色
+    // 规则：只要 WiFi 或以太网任意一侧有“启用且有有效 IP 的连接”，就不显示红色；
+    // 只有两者都无有效连接时才视为“网络断开”并显示红色。
+    // 如果启用了自动切换，跳过网络状态检查的颜色更新，让自动切换管理颜色。
+    if (isAutoSwitchEnabled) {
+      // 自动切换已启用，跳过网络状态检查的颜色更新
+      // 自动切换会在切换完成后更新托盘颜色
+      // 只更新 UI 状态，不更新托盘颜色
+      await updateNetworkStatusUI(isOnline);
+      return;
+    }
+    
+    // NOTE:
+    // 不再依赖前端的 online/offline 抖动结果来决定是否变红，
+    // 仅根据后端网卡是否有有效连接来判断，避免在 WiFi 实际在线时频繁误判为离线。
+    if (allMainAdaptersDisconnected) {
+      // 以太网和WiFi都断开，设置为红色
       // 在设置为红色之前，先保存当前颜色（如果还没有保存的话）
       if (!state.getLastTrayColor()) {
         // 优先检查当前场景的颜色

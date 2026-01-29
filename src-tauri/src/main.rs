@@ -171,6 +171,7 @@ fn main() {
             network::set_dhcp,
             network::disable_adapter,
             network::enable_adapter,
+            network::get_adapter_media_states,
             set_dns_servers,
             get_hosts,
             set_hosts,

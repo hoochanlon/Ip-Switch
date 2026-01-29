@@ -374,36 +374,39 @@ async function performAutoSwitch(force = false) {
       autoSwitchLocked = true;
     }
 
+    // 计算托盘颜色：
+    // - 不再在“both_failed”时强制改成红色，而是始终使用配置中的 trayColor，
+    //   这样托盘颜色只表达“当前使用的是哪一侧网络”，
+    //   而真正的“完全断网”则交给 main.js 按网卡在线情况统一判定。
     let trayColor;
     if (result?.result === 'both_failed') {
-      trayColor = '#FF0000';
-      console.warn('网络异常：两侧都无法ping通，已回退到原侧');
-    } else {
-      // 优先按照“本次实际判定使用的 ping 目标”来映射托盘颜色，
-      // 这样颜色就跟“场景/目标”绑定，而不是死绑 network1/network2 的序号。
-      // 注意：后端通过 serde(rename_all = "camelCase") 导出为 activePingTarget。
-      const activePing = result?.activePingTarget || null;
-      if (activePing) {
-        if (activePing === network1Config.pingTarget) {
-          trayColor = network1Config.trayColor;
-        } else if (activePing === network2Config.pingTarget) {
-          trayColor = network2Config.trayColor;
-        }
-      }
-
-      // 兜底：如果没匹配到（例如用户改过目标），仍然按 activeNetwork 侧取颜色
-      if (!trayColor) {
-        trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
+      console.warn('网络异常：两侧都无法ping通，已回退到原侧（托盘仍使用当前侧颜色，仅通过日志提示问题）');
+    }
+    // 优先按照“本次实际判定使用的 ping 目标”来映射托盘颜色，
+    // 这样颜色就跟“场景/目标”绑定，而不是死绑 network1/network2 的序号。
+    // 注意：后端通过 serde(rename_all = "camelCase") 导出为 activePingTarget。
+    const activePing = result?.activePingTarget || null;
+    if (activePing) {
+      if (activePing === network1Config.pingTarget) {
+        trayColor = network1Config.trayColor;
+      } else if (activePing === network2Config.pingTarget) {
+        trayColor = network2Config.trayColor;
       }
     }
 
+    // 兜底：如果没匹配到（例如用户改过目标），仍然按 activeNetwork 侧取颜色
+    if (!trayColor) {
+      trayColor = activeNetwork === 'network2' ? network2Config.trayColor : network1Config.trayColor;
+    }
+
+    // 立即更新托盘颜色，不等待后续操作，提升响应速度
     if (trayColor) {
-      try {
-        await invoke('update_tray_icon_color', { hexColor: trayColor });
+      // 异步更新，不阻塞后续操作
+      invoke('update_tray_icon_color', { hexColor: trayColor }).then(() => {
         state.setLastTrayColor(trayColor);
-      } catch (error) {
+      }).catch(error => {
         console.warn('更新托盘图标颜色失败:', error);
-      }
+      });
     }
     
     // 刷新网络信息（只更新数据，不强制重绘，避免正在查看的网卡列表闪烁）
@@ -616,12 +619,12 @@ async function applyAutoSwitchTrayColor() {
     activeSide === 'network2' ? network2Config.trayColor : network1Config.trayColor;
 
   if (!trayColor) return;
-  try {
-    await invoke('update_tray_icon_color', { hexColor: trayColor });
+  // 立即更新托盘颜色，不等待
+  invoke('update_tray_icon_color', { hexColor: trayColor }).then(() => {
     state.setLastTrayColor(trayColor);
-  } catch (err) {
+  }).catch(err => {
     console.warn('自动切换：更新托盘颜色失败:', err);
-  }
+  });
 }
 
 // 启动自动切换（仅启用“拔插网线触发”，不做定时轮询和初始化切换）

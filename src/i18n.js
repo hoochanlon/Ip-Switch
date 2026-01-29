@@ -145,6 +145,8 @@ const DICT = {
     mediaStateLabel: '媒体状态',
     mediaStateEnabled: '已启用',
     mediaStateDisabled: '已禁用',
+    mediaStateDisconnected: '网线被拔出',
+    mediaStateUpMediaDisconnected: '网线被拔出',
 
     // 自动切换
     autoSwitchConfigTitle: '自动双向切换配置',
@@ -326,6 +328,8 @@ const DICT = {
     mediaStateLabel: 'Media state',
     mediaStateEnabled: 'Enabled',
     mediaStateDisabled: 'Disabled',
+    mediaStateDisconnected: 'Cable unplugged',
+    mediaStateUpMediaDisconnected: 'Cable unplugged',
 
     // Auto switch
     autoSwitchConfigTitle: 'Auto Switch (2-way) Configuration',

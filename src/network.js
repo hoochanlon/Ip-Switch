@@ -8,6 +8,8 @@ import { t } from './i18n.js';
 // 避免并发多次调用后端 `get_network_info` 导致同时创建大量 PowerShell 进程
 // 使用单航班（single-flight）机制：同一时刻只允许一个刷新在执行，其它调用复用同一个 Promise
 let refreshInFlightPromise = null;
+let mediaStateRefreshInFlight = null;
+let mediaStateTimer = null;
 
 function buildNetworkSignature(list) {
   if (!Array.isArray(list)) return '';
@@ -130,6 +132,56 @@ export async function refreshNetworkInfo(showLoading = false, options = {}) {
   });
 
   return refreshInFlightPromise;
+}
+
+// 启动一个“轻量媒体状态轮询”，专门加速“媒体状态已启用/已禁用”的刷新，
+// 避免每次都全量拉取 get_network_info。
+export function startFastMediaStateWatcher() {
+  if (mediaStateTimer) {
+    clearInterval(mediaStateTimer);
+    mediaStateTimer = null;
+  }
+
+  const tick = async () => {
+    // 如果正在做重型刷新或网络切换，就让重型流程主导
+    if (refreshInFlightPromise || mediaStateRefreshInFlight || state.isNetworkChanging) return;
+    if (!state.currentNetworkInfo || state.currentNetworkInfo.length === 0) return;
+
+    mediaStateRefreshInFlight = (async () => {
+      try {
+        const list = await invoke('get_adapter_media_states');
+        if (!Array.isArray(list) || list.length === 0) return;
+        const map = new Map(list.map(item => [
+          String(item.name).toLowerCase(), 
+          { is_enabled: !!item.is_enabled, media_status: item.media_status || null }
+        ]));
+
+        // 仅就地更新 is_enabled 和 media_status 字段，其它字段保持不变
+        const updated = state.currentNetworkInfo.map(adapter => {
+          const key = String(adapter.name || '').toLowerCase();
+          if (!map.has(key)) return adapter;
+          const stateInfo = map.get(key);
+          // 如果状态未变化，直接复用
+          if (adapter.is_enabled === stateInfo.is_enabled && 
+              adapter.media_status === stateInfo.media_status) {
+            return adapter;
+          }
+          return { ...adapter, is_enabled: stateInfo.is_enabled, media_status: stateInfo.media_status };
+        });
+
+        state.setCurrentNetworkInfo(updated);
+        // 仅更新卡片上的动态字段（状态徽章 / 媒体状态文案 / 按钮），不整卡重绘
+        updateNetworkInfoStatsView();
+      } catch (e) {
+        console.warn('快速刷新媒体状态失败:', e);
+      } finally {
+        mediaStateRefreshInFlight = null;
+      }
+    })();
+  };
+
+  // 每 300ms 轮询一次，接近系统托盘级别的响应速度，但只做轻量操作
+  mediaStateTimer = setInterval(tick, 300);
 }
 
 // 渲染网络信息
@@ -399,11 +451,19 @@ function renderFullMode(container) {
     
     const ipType = adapter.is_dhcp ? 'DHCP' : t('staticIpShort');
     const status = adapter.is_enabled ? t('connected') : t('disconnected');
-    const toggleLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
-    const toggleAction = adapter.is_enabled ? 'disable' : 'enable';
+    
+    // 判断按钮状态：如果网线被拔出（UpMediaDisconnected/Disconnected），网卡本身是启用的，不应该显示"启用"按钮
+    const mediaStatus = (adapter.media_status || '').toLowerCase();
+    const isCableUnplugged = mediaStatus === 'upmediadisconnected' || mediaStatus === 'disconnected';
+    const isActuallyDisabled = !adapter.is_enabled && !isCableUnplugged;
+    
+    const toggleLabel = adapter.is_enabled ? t('disableAdapter') : (isCableUnplugged ? '' : t('enableAdapter'));
+    const toggleAction = adapter.is_enabled ? 'disable' : (isCableUnplugged ? '' : 'enable');
     const toggleBtnClass = adapter.is_enabled
       ? 'btn btn-danger adapter-toggle-btn'
-      : 'btn btn-success adapter-toggle-btn';
+      : (isCableUnplugged ? 'btn btn-secondary adapter-toggle-btn' : 'btn btn-success adapter-toggle-btn');
+    const toggleBtnDisabled = isCableUnplugged ? 'disabled' : '';
+    const toggleBtnStyle = isCableUnplugged ? 'display: none;' : '';
     
     card.innerHTML = `
       <div class="network-header">
@@ -443,7 +503,16 @@ function renderFullMode(container) {
         </div>
         <div class="detail-row">
           <span class="label">${t('mediaStateLabel')}:</span>
-          <span class="value value-media-state">${adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled')}</span>
+          <span class="value value-media-state">${(() => {
+            if (adapter.is_enabled) {
+              return t('mediaStateEnabled');
+            }
+            const status = (adapter.media_status || '').toLowerCase();
+            if (status === 'upmediadisconnected' || status === 'disconnected') {
+              return t('mediaStateDisconnected');
+            }
+            return t('mediaStateDisabled');
+          })()}</span>
         </div>
         <div class="detail-row">
           <span class="label">${t('speedLabel')}:</span>
@@ -460,11 +529,13 @@ function renderFullMode(container) {
       </div>
       <div class="network-card-actions" style="display:flex; gap:10px; margin-top: 10px; justify-content: flex-end;">
         <button class="btn btn-primary" onclick="window.editNetworkConfig('${adapter.name}')">${t('configureNetwork')}</button>
-        <button
+        ${toggleLabel ? `<button
           class="${toggleBtnClass}"
           data-action="${toggleAction}"
+          ${toggleBtnDisabled}
           onclick="window.toggleNetworkAdapter('${adapter.name}', this)"
-        >${toggleLabel}</button>
+          style="${toggleBtnStyle}"
+        >${toggleLabel}</button>` : ''}
       </div>
     `;
     
@@ -528,21 +599,49 @@ export function updateNetworkInfoStatsView() {
     setText('.value-subnet-mask', adapter.subnet_mask || t('notConfigured'));
     setText('.value-gateway', adapter.gateway || t('notConfigured'));
     setText('.value-dns-servers', adapter.dns_servers?.join(', ') || t('notConfigured'));
-    setText('.value-media-state', adapter.is_enabled ? t('mediaStateEnabled') : t('mediaStateDisabled'));
+    // 根据 media_status 显示详细状态
+    let mediaStateText = t('mediaStateDisabled');
+    if (adapter.is_enabled) {
+      mediaStateText = t('mediaStateEnabled');
+    } else if (adapter.media_status) {
+      const status = adapter.media_status.toLowerCase();
+      if (status === 'upmediadisconnected' || status === 'disconnected') {
+        mediaStateText = t('mediaStateDisconnected');
+      } else if (status === 'disabled') {
+        mediaStateText = t('mediaStateDisabled');
+      }
+    }
+    setText('.value-media-state', mediaStateText);
     setText('.value-speed', adapter.link_speed || t('unknown'));
     setText('.value-bytes-received', formatBytes(adapter.bytes_received));
     setText('.value-bytes-sent', formatBytes(adapter.bytes_sent));
 
     // 启用/禁用按钮（就地更新，避免整体重绘）
+    // 判断按钮状态：如果网线被拔出，不应该显示"启用"按钮
+    const mediaStatus = (adapter.media_status || '').toLowerCase();
+    const isCableUnplugged = mediaStatus === 'upmediadisconnected' || mediaStatus === 'disconnected';
+    const isActuallyDisabled = !adapter.is_enabled && !isCableUnplugged;
+    
     const toggleBtn = card.querySelector('.adapter-toggle-btn');
     if (toggleBtn) {
-      const nextAction = adapter.is_enabled ? 'disable' : 'enable';
-      const nextLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
-      const nextClass =
-        adapter.is_enabled ? 'btn btn-danger adapter-toggle-btn' : 'btn btn-success adapter-toggle-btn';
-      toggleBtn.setAttribute('data-action', nextAction);
-      toggleBtn.textContent = nextLabel;
-      toggleBtn.className = nextClass;
+      if (isCableUnplugged) {
+        // 网线被拔出时，隐藏按钮（网卡本身是启用的，不需要启用按钮）
+        toggleBtn.style.display = 'none';
+      } else {
+        // 正常情况：显示启用/禁用按钮
+        toggleBtn.style.display = '';
+        const nextAction = adapter.is_enabled ? 'disable' : 'enable';
+        const nextLabel = adapter.is_enabled ? t('disableAdapter') : t('enableAdapter');
+        const nextClass =
+          adapter.is_enabled ? 'btn btn-danger adapter-toggle-btn' : 'btn btn-success adapter-toggle-btn';
+        toggleBtn.setAttribute('data-action', nextAction);
+        toggleBtn.removeAttribute('disabled');
+        toggleBtn.textContent = nextLabel;
+        toggleBtn.className = nextClass;
+      }
+    } else if (!isCableUnplugged) {
+      // 如果按钮不存在但应该显示，需要重新渲染（这种情况很少见，但为了完整性）
+      // 这里不做处理，因为 updateNetworkInfoStatsView 只做就地更新，不重新创建按钮
     }
   });
 }

@@ -40,6 +40,10 @@ pub struct NetworkAdapter {
     pub network_type: String, // "wifi", "ethernet", "bluetooth", "vpn", "other"
     pub is_wireless: bool, // 保持向后兼容
     pub is_enabled: bool,
+    /// 媒体状态详情：用于区分"被禁用"和"网线被拔出"
+    /// 可能的值：None（未知）、"Up"（已连接）、"Disabled"（已禁用）、"Disconnected"（断开）、"UpMediaDisconnected"（网线被拔出）
+    #[serde(default)]
+    pub media_status: Option<String>,
     pub is_dhcp: bool,
     pub ip_address: Option<String>,
     pub subnet_mask: Option<String>,
@@ -157,6 +161,8 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
         
         let status = adapter_json["Status"].as_str().unwrap_or("Disabled");
         let is_enabled = status == "Up";
+        // 保存原始状态字符串，用于前端区分"被禁用"和"网线被拔出"
+        let media_status = Some(status.to_string());
         
         let mac = adapter_json["MacAddress"]
             .as_str()
@@ -195,6 +201,7 @@ pub async fn get_network_info() -> Result<Vec<NetworkAdapter>, String> {
             network_type: network_type.clone(),
             is_wireless,
             is_enabled,
+            media_status,
             is_dhcp: ip_config.is_dhcp,
             ip_address: ip_config.ip_address,
             subnet_mask: ip_config.subnet_mask,
@@ -1111,4 +1118,85 @@ pub async fn enable_adapter(adapter_name: String) -> Result<(), String> {
     
     check_powershell_output(&enable_output, &format!("启用网卡 {}", adapter_name))?;
     Ok(())
+}
+
+/// 轻量获取所有网卡的媒体状态（仅 Name + Status），用于前端快速刷新“媒体状态已启用/已禁用”
+#[derive(Debug, Serialize)]
+pub struct AdapterMediaState {
+    pub name: String,
+    pub is_enabled: bool,
+    /// 媒体状态详情：用于区分"被禁用"和"网线被拔出"
+    pub media_status: Option<String>,
+}
+
+#[tauri::command]
+pub async fn get_adapter_media_states() -> Result<Vec<AdapterMediaState>, String> {
+    // 使用更轻量的 PowerShell 命令，只取 Name + Status，避免额外统计/路由/DNS 查询带来的开销
+    let output = powershell_cmd()
+        .args(&[
+            "-Command",
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
+             Get-NetAdapter | Select-Object Name, Status | ConvertTo-Json -Depth 4",
+        ])
+        .output()
+        .map_err(|e| format!("执行获取网卡媒体状态命令失败: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if stdout.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // 解析为 JSON（兼容单对象和数组）
+    let value: serde_json::Value = serde_json::from_str(&stdout)
+        .map_err(|e| format!("解析网卡媒体状态 JSON 失败: {} ({})", e, stdout))?;
+
+    let mut result = Vec::new();
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                let name = item
+                    .get("Name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    continue;
+                }
+                let status_str = item
+                    .get("Status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let is_enabled = status_str.eq_ignore_ascii_case("Up");
+                result.push(AdapterMediaState { 
+                    name, 
+                    is_enabled,
+                    media_status: Some(status_str),
+                });
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            let name = obj
+                .get("Name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if !name.is_empty() {
+                let status_str = obj
+                    .get("Status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let is_enabled = status_str.eq_ignore_ascii_case("Up");
+                result.push(AdapterMediaState { 
+                    name, 
+                    is_enabled,
+                    media_status: Some(status_str),
+                });
+            }
+        }
+        _ => {}
+    }
+
+    Ok(result)
 }
