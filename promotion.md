@@ -27,12 +27,12 @@ IP Switch 是一款专为 Windows 桌面运维、网络运维用户打造的网�
 
 1 网络状态一览无余
 
-![](./screenshots/main.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/main.png)
 
 
 2 场景管理，轻松切换
 
-![](./screenshots/scene.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/scene.png)
 
 创建多个网络场景，每个场景包含：
 - IP 配置（静态 IP 或 DHCP）
@@ -43,11 +43,11 @@ IP Switch 是一款专为 Windows 桌面运维、网络运维用户打造的网�
 
 3 Hosts 文件管理
 
-![](./screenshots/hosts.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/hosts.png)
 
 4 代理配置管理
 
-![](./screenshots/proxy-config.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/proxy-config.png)
 
 灵活的代理配置：
 - 支持本地和远程 PAC 文件
@@ -57,11 +57,11 @@ IP Switch 是一款专为 Windows 桌面运维、网络运维用户打造的网�
 
 5 双向流量监控
 
-![](./screenshots/2way.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/2way.png)
 
 6 配置效果验证
 
-![](./screenshots/google.png)
+![](https://cdn.jsdelivr.net/gh/hoochanlon/Ip-Switch@main/screenshots/google.png)
 
 
 ## 🚀 使用场景
