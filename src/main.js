@@ -370,7 +370,16 @@ function setupEventListeners() {
       }
     });
   }
-  document.getElementById('about-btn').addEventListener('click', showAboutModal);
+  const aboutBtn = document.getElementById('about-btn');
+  if (aboutBtn) {
+    aboutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showAboutModal();
+    });
+  } else {
+    console.error('关于按钮未找到');
+  }
   document.getElementById('create-scene-btn').addEventListener('click', window.createScene);
   document.getElementById('edit-hosts-btn').addEventListener('click', editHosts);
   document.getElementById('edit-proxy-btn').addEventListener('click', editProxy);
