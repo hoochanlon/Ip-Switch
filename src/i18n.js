@@ -14,6 +14,9 @@ const DICT = {
 
     online: '在线',
     offline: '离线',
+    proxyStatus: '代理状态:',
+    proxyEnabled: '已启用',
+    proxyDisabled: '未启用',
     sceneMode: '场景模式:',
     sceneNotApplied: '未应用',
 
@@ -197,6 +200,9 @@ const DICT = {
 
     online: 'Online',
     offline: 'Offline',
+    proxyStatus: 'Proxy:',
+    proxyEnabled: 'Enabled',
+    proxyDisabled: 'Disabled',
     sceneMode: 'Scene:',
     sceneNotApplied: 'Not applied',
 

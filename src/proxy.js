@@ -30,11 +30,11 @@ function showProxyEditor(proxy) {
             <span>${t('proxyEnabled')}</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="proxy-auto-detect" ${proxy.auto_detect ? 'checked' : ''}>
+            <input type="checkbox" id="proxy-auto-detect" ${proxy.autoDetect ? 'checked' : ''}>
             <span>${t('proxyAutoDetect')}</span>
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="proxy-use-script" ${proxy.auto_config_url ? 'checked' : ''}>
+            <input type="checkbox" id="proxy-use-script" ${proxy.autoConfigUrl ? 'checked' : ''}>
             <span>${t('proxyUseScript')}</span>
           </label>
         </div>
@@ -42,7 +42,7 @@ function showProxyEditor(proxy) {
           <label for="proxy-script-url">${t('proxyScriptAddress')}</label>
           <input type="text" id="proxy-script-url" class="form-input"
                  placeholder="http://127.0.0.1:8080/proxy.pac"
-                 value="${proxy.auto_config_url || ''}">
+                 value="${proxy.autoConfigUrl || ''}">
         </div>
         <div class="form-group">
           <label for="proxy-server">${t('proxyServer')}</label>
@@ -88,11 +88,15 @@ window.saveProxy = async function() {
       enabled,
       server: enabled ? server : '',
       bypass,
-      auto_detect: autoDetect,
-      auto_config_url: useScript ? scriptUrl : ''
+      autoDetect: autoDetect,
+      autoConfigUrl: useScript ? scriptUrl : ''
     });
     alert(t('proxyUpdated'));
     document.querySelector('.modal-overlay')?.remove();
+    // 更新状态指示器中的代理状态
+    if (window.updateStatusIndicator) {
+      await window.updateStatusIndicator();
+    }
   } catch (error) {
     alert(t('updateProxyFailed', { error }));
   }

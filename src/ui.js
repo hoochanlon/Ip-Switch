@@ -1,9 +1,10 @@
 // UI 状态指示器和对话框相关功能
 
+import { invoke } from '@tauri-apps/api/core';
 import * as state from './state.js';
 import { t } from './i18n.js';
 
-// 更新状态指示器（网络状态和场景模式）
+// 更新状态指示器（网络状态、代理状态和场景模式）
 export async function updateStatusIndicator() {
   // 更新网络状态
   const networkIndicator = document.getElementById('network-status-indicator');
@@ -11,6 +12,21 @@ export async function updateStatusIndicator() {
     const isOnline = state.networkStatus ? state.networkStatus.getStatus().isOnline : navigator.onLine;
     networkIndicator.textContent = isOnline ? t('online') : t('offline');
     networkIndicator.className = `status-badge ${isOnline ? 'status-online' : 'status-offline'}`;
+  }
+  
+  // 更新代理状态
+  const proxyIndicator = document.getElementById('proxy-status-indicator');
+  if (proxyIndicator) {
+    try {
+      const proxy = await invoke('get_proxy');
+      const isProxyEnabled = proxy.enabled || false;
+      proxyIndicator.textContent = isProxyEnabled ? t('proxyEnabled') : t('proxyDisabled');
+      proxyIndicator.className = `status-badge ${isProxyEnabled ? 'status-proxy-enabled' : 'status-proxy-disabled'}`;
+    } catch (error) {
+      console.warn('获取代理状态失败:', error);
+      proxyIndicator.textContent = t('proxyDisabled');
+      proxyIndicator.className = 'status-badge status-proxy-disabled';
+    }
   }
   
   // 更新场景模式
@@ -50,3 +66,4 @@ export function closeAboutModal() {
 // 将函数挂载到 window 对象以便全局访问
 window.showAboutModal = showAboutModal;
 window.closeAboutModal = closeAboutModal;
+window.updateStatusIndicator = updateStatusIndicator;

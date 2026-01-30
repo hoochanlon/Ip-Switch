@@ -3,6 +3,7 @@ use winreg::enums::*;
 use winreg::RegKey;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProxyConfig {
     pub enabled: bool,
     pub server: String,
@@ -60,8 +61,8 @@ pub async fn set_proxy(
     enabled: bool,
     server: String,
     bypass: Vec<String>,
-    auto_detect: bool,
-    auto_config_url: String,
+    autoDetect: bool,
+    autoConfigUrl: String,
 ) -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (internet_settings, _) = hkcu
@@ -90,16 +91,16 @@ pub async fn set_proxy(
 
     // 自动检测开关
     internet_settings
-        .set_value("AutoDetect", &(if auto_detect { 1u32 } else { 0u32 }))
+        .set_value("AutoDetect", &(if autoDetect { 1u32 } else { 0u32 }))
         .map_err(|e| format!("设置自动检测失败: {}", e))?;
 
     // 自动配置脚本地址（PAC）
-    if auto_config_url.trim().is_empty() {
+    if autoConfigUrl.trim().is_empty() {
         // 清空时删除键值，避免残留
         let _ = internet_settings.delete_value("AutoConfigURL");
     } else {
         internet_settings
-            .set_value("AutoConfigURL", &auto_config_url)
+            .set_value("AutoConfigURL", &autoConfigUrl)
             .map_err(|e| format!("设置自动配置脚本地址失败: {}", e))?;
     }
 

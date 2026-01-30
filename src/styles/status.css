@@ -54,3 +54,20 @@
   color: #374151;
 }
 
+.status-proxy-enabled {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.status-proxy-disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-proxy-enabled::before {
+  background: #3b82f6;
+}
+
+.status-proxy-disabled::before {
+  background: #9ca3af;
+}
