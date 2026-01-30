@@ -24,16 +24,16 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
     currentActive: 'network1',
     network1: {
       mode: 'dhcp',
-      dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+      dhcp: { dns: [] },
       staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-      pingTarget: 'baidu.com',
+      pingTarget: '',
       trayColor: '#00FF00'
     },
     network2: {
       mode: 'static',
       dhcp: { dns: [] },
-      staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
-      pingTarget: '172.16.1.254',
+      staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+      pingTarget: '',
       trayColor: '#FFA500'
     }
   };
@@ -83,7 +83,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                     id="network1-dhcp-dns"
                     class="form-input"
                     placeholder=" "
-                    value="${safeConfig.network1?.dhcp?.dns?.join(', ') || '192.168.1.250, 114.114.114.114'}">
+                    value="${safeConfig.network1?.dhcp?.dns?.join(', ') || ''}">
                   <label for="network1-dhcp-dns" class="form-label">${t('dnsServersLabelShort')}</label>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                     id="network1-ping"
                     class="form-input" 
                     placeholder=" "
-                    value="${safeConfig.network1?.pingTarget || 'baidu.com'}">
+                    value="${safeConfig.network1?.pingTarget || ''}">
                   <label for="network1-ping" class="form-label">${t('pingTarget')} (${t('pingHintToNetwork2')})</label>
                 </div>
               </div>
@@ -194,7 +194,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                       id="network2-static-ip"
                       class="form-input" 
                       placeholder=" "
-                      value="${safeConfig.network2?.staticConfig?.ip || '172.16.1.55'}">
+                      value="${safeConfig.network2?.staticConfig?.ip || ''}">
                     <label for="network2-static-ip" class="form-label">${t('ipAddress')} (${t('ipExample')})</label>
                   </div>
                 </div>
@@ -205,7 +205,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                       id="network2-static-subnet"
                       class="form-input" 
                       placeholder=" "
-                      value="${safeConfig.network2?.staticConfig?.subnet || '255.255.255.0'}">
+                      value="${safeConfig.network2?.staticConfig?.subnet || ''}">
                     <label for="network2-static-subnet" class="form-label">${t('subnetMask')} (${t('subnetExample')})</label>
                   </div>
                 </div>
@@ -216,7 +216,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                       id="network2-static-gateway"
                       class="form-input" 
                       placeholder=" "
-                      value="${safeConfig.network2?.staticConfig?.gateway || '172.16.1.254'}">
+                      value="${safeConfig.network2?.staticConfig?.gateway || ''}">
                     <label for="network2-static-gateway" class="form-label">${t('gateway')} (${t('gatewayExample')})</label>
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                       id="network2-static-dns"
                       class="form-input" 
                       placeholder=" "
-                      value="${safeConfig.network2?.staticConfig?.dns?.join(', ') || '172.16.1.6'}">
+                      value="${safeConfig.network2?.staticConfig?.dns?.join(', ') || ''}">
                     <label for="network2-static-dns" class="form-label">${t('dnsServersLabelShort')}</label>
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export function buildAutoSwitchModalHtml(currentConfig, mainAdapters, fromCheckb
                     id="network2-ping"
                     class="form-input" 
                     placeholder=" "
-                    value="${safeConfig.network2?.pingTarget || '172.16.1.254'}">
+                    value="${safeConfig.network2?.pingTarget || ''}">
                   <label for="network2-ping" class="form-label">${t('pingTarget')} (${t('pingHintToNetwork1')})</label>
                 </div>
               </div>

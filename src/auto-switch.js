@@ -72,21 +72,21 @@ export function initAutoSwitch() {
           currentActive: 'network1',
           network1: {
             mode: 'dhcp',
-            dhcp: { dns: autoSwitchConfig.dhcpConfig?.dns || ['192.168.1.250', '114.114.114.114'] },
+            dhcp: { dns: autoSwitchConfig.dhcpConfig?.dns || [] },
             staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-            pingTarget: autoSwitchConfig.dhcpPingTarget || 'baidu.com',
+            pingTarget: autoSwitchConfig.dhcpPingTarget || '',
             trayColor: autoSwitchConfig.dhcpTrayColor || '#00FF00'
           },
           network2: {
             mode: 'static',
             dhcp: { dns: [] },
             staticConfig: {
-              ip: autoSwitchConfig.staticConfig?.ip || '172.16.1.55',
-              subnet: autoSwitchConfig.staticConfig?.subnet || '255.255.255.0',
-              gateway: autoSwitchConfig.staticConfig?.gateway || '172.16.1.254',
-              dns: autoSwitchConfig.staticConfig?.dns || ['172.16.1.6']
+              ip: autoSwitchConfig.staticConfig?.ip || '',
+              subnet: autoSwitchConfig.staticConfig?.subnet || '',
+              gateway: autoSwitchConfig.staticConfig?.gateway || '',
+              dns: autoSwitchConfig.staticConfig?.dns || []
             },
-            pingTarget: autoSwitchConfig.staticPingTarget || autoSwitchConfig.staticConfig?.gateway || '172.16.1.254',
+            pingTarget: autoSwitchConfig.staticPingTarget || autoSwitchConfig.staticConfig?.gateway || '',
             trayColor: autoSwitchConfig.staticTrayColor || '#FFA500'
           }
         };
@@ -324,16 +324,16 @@ async function performAutoSwitch(force = false) {
   
   const network1Defaults = {
     mode: 'dhcp',
-    dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+    dhcp: { dns: [] },
     staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-    pingTarget: 'baidu.com',
+    pingTarget: '',
     trayColor: '#00FF00'
   };
   const network2Defaults = {
     mode: 'static',
     dhcp: { dns: [] },
-    staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
-    pingTarget: '172.16.1.254',
+    staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+    pingTarget: '',
     trayColor: '#FFA500'
   };
 
@@ -458,16 +458,16 @@ async function toggleByDhcpStatusOnPlug() {
 
   const network1Defaults = {
     mode: 'dhcp',
-    dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+    dhcp: { dns: [] },
     staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-    pingTarget: 'baidu.com',
+    pingTarget: '',
     trayColor: '#00FF00'
   };
   const network2Defaults = {
     mode: 'static',
     dhcp: { dns: [] },
-    staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
-    pingTarget: '172.16.1.254',
+    staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+    pingTarget: '',
     trayColor: '#FFA500'
   };
 
@@ -598,16 +598,16 @@ async function applyAutoSwitchTrayColor() {
   // 与 performAutoSwitch / toggleByDhcpStatusOnPlug 保持一致的默认值
   const network1Defaults = {
     mode: 'dhcp',
-    dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+    dhcp: { dns: [] },
     staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-    pingTarget: 'baidu.com',
+    pingTarget: '',
     trayColor: '#00FF00'
   };
   const network2Defaults = {
     mode: 'static',
     dhcp: { dns: [] },
-    staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
-    pingTarget: '172.16.1.254',
+    staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+    pingTarget: '',
     trayColor: '#FFA500'
   };
 
@@ -778,16 +778,16 @@ export function showAutoSwitchConfig(fromCheckbox = false) {
     currentActive: 'network1',
     network1: {
       mode: 'dhcp',
-      dhcp: { dns: ['192.168.1.250', '114.114.114.114'] },
+      dhcp: { dns: [] },
       staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
-      pingTarget: 'baidu.com',
+      pingTarget: '',
       trayColor: '#00FF00'
     },
     network2: {
       mode: 'static',
       dhcp: { dns: [] },
-      staticConfig: { ip: '172.16.1.55', subnet: '255.255.255.0', gateway: '172.16.1.254', dns: ['172.16.1.6'] },
-      pingTarget: '172.16.1.254',
+      staticConfig: { ip: '', subnet: '', gateway: '', dns: [] },
+      pingTarget: '',
       trayColor: '#FFA500'
     }
   };
