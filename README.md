@@ -1,176 +1,193 @@
 # IP Switch
 
-[中文 README](./README_CN.md)
+[English](./README-EN.md)
 
 <p align="center">
-  <img src="./imgs/tarui/logo.png" alt="App icon" width="100"><br/>
-  <img src="./imgs/tarui/red-heart.png" width="50">
+  <img src="./imgs/tarui/logo.png" alt="软件图标" width="100"><br/>
+    <img src="./imgs/tarui/red-heart.png" width="50">
   <img src="./imgs/tarui/add.png" height="50"> 
-  <img src="./imgs/tarui/tarui.png" height="50"> <br/> <br/>
-  Switch network “scenes” effortlessly. Hosts and proxy settings work together, with real-time traffic monitoring and network status notifications—so every connection feels smooth and under control.
+   <img src="./imgs/tarui/tarui.png" height="50"> <br/> <br/>
+  随心切换场景，Hosts 与代理智能协同，实时流量监控 + 网络状态提醒，让每一次上网都自由而从容。
 </p>
 
-## Features
+## 功能特性
 
 > [!NOTE]
-> **Run as Administrator is required**: modifying network configuration needs elevated privileges on Windows.
+> **需要管理员权限运行**：修改网络配置需要管理员权限。
 
-- ✅ Network status overview (Wi‑Fi/Ethernet, Static/DHCP, IP details)
-- ✅ IP configuration switch (Static IP / DHCP)
-- ✅ Scene switching (save/load configuration profiles)
-- ✅ Hosts file editor, supports remote updates
-- ✅ Proxy configuration management, supports remote PAC updates
-- ✅ Tray color customization + dynamic colors for different network states
-- ✅ Window UX: maximize/restore sync, double‑click titlebar to toggle, maximized layout widens the Scene Manager panel
 
-Download: https://github.com/hoochanlon/Ip-Switch/releases
+- ✅ 网络状态显示（WiFi/有线网络、静态/动态IP、IP详情）
+- ✅ IP 配置修改（静态IP/DHCP切换）
+- ✅ 场景切换（保存/加载配置场景）
+- ✅ Hosts 文件编辑，支持远程更新
+- ✅ 代理配置管理，支持远程PAC更新
+- ✅ 托盘颜色可自定义，以及能够根据不同的网络状态显示不同的颜色
+- ✅ 窗口体验优化：最大化/还原状态同步、双击标题栏空白处切换、最大化时“网卡场景管理”区域自动变宽
 
-## Screenshots
 
-Configuration
+下载：https://github.com/hoochanlon/Ip-Switch/releases
+
+## 截图展示
+
+软件配置
 
 <!-- ![](./screenshots/demo.png) -->
 
 ![](./screenshots/proxy-config.png)
 
-Result
+配置效果
 
 ![](./screenshots/google.png)
 
-## Development
+## 开发模式
 
-Requirements
+环境要求
 
 - Node.js 18+
 - Rust 1.70+
-- Windows 10/11 (Administrator privileges required)
+- Windows 10/11（需要管理员权限）
 
-Install dependencies & run
+安装依赖 & 启动运行
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-Build
+或以管理员权限运行
+
+```
+npm run dev:admin
+```
+
+
+构建
 
 ```bash
 npm run tauri build
 ```
 
-## NSIS packaging
+NSIS(nullsoft scriptable install system)封装打包，软件下载：
 
-nullsoft scriptable install system
+* https://www.mefcl.com/nsis-3-0-5.html
+* https://www.cnblogs.com/NSIS/p/16581122.html
 
-**Downloads:**
+以及图标缓存清除工具：https://www.sordum.org/9194/rebuild-shell-icon-cache-v1-3/
 
-- `https://www.mefcl.com/nsis-3-0-5.html`
-- `https://www.cnblogs.com/NSIS/p/16581122.html`
+操作过程：
 
-**Basic usage:**
+编译 NSI 脚本 > 文件 > 加载脚本 > ip-switch.nsi
 
-- Compile NSI script via GUI: **Compile NSI script → File → Load Script → `ip-switch.nsi`**
-- Or use one‑shot command:
+或使用一次性命令
 
-```bash
+```
 "C:\Program Files (x86)\NSIS\makensis.exe" ip-switch.nsi
 ```
 
-Optionally, add NSIS to your `PATH` (pick one of the following), then run from the project root:
+以及加入环境变量方式（以下二选一），配合使用
 
 ```powershell
-[Environment]::SetEnvironmentVariable(
-  'Path',
-  $env:Path + ';C:\Program Files (x86)\NSIS',
-  'User'
-)
+[Environment]::SetEnvironmentVariable('Path',$env:Path + ';C:\Program Files (x86)\NSIS','User')
 ```
 
 ```cmd
 setx PATH "%PATH%;C:\Program Files (x86)\NSIS"
 ```
 
-Then, in the project directory:
+关闭所有窗口，到项目路径执行
 
-```bash
+```
 makensis ip-switch.nsi
 ```
+
+## Traffic
+
+技术术语对照
+
+* 上行 / 发送：Upload / Uplink / Outbound / Tx (Transmit)
+* 下行 / 接收：Download / Downlink / Inbound / Rx (Receive)
+
+直白解释
+
+上行（发送）：你的设备发出去的数据，比如上传文件、发消息、视频通话中你的画面和声音。
+下行（接收）：从网络、服务器、其他设备等接收到的数据，比如看视频、加载网页、收文件。
 
 ## Proxy
 
 > [!NOTE]
-> Ad-blocking rules ≠ Clash subscription proxy rules. The former focuses on “fine-grained ad removal”, while the latter is “global traffic routing + (optionally) blocking ad domains”. You can still import dedicated ad rule sets into Clash to improve ad-blocking.
+> 广告屏蔽规则 ≠ Clash 订阅代理规则，前者是“精细杀广告”，后者是“全局流量分流 + 顺带杀广告域名”。但 Clash 可以导入“广告专用规则集”来增强去广告效果。
 
-PAC vs Ad-blocking rules
+PAC vs 广告屏蔽规则对比
 
-| Item     | Purpose                    | Common tools           | What it blocks/routes  | Example path                                                  | Metaphor       |
-|----------|----------------------------|------------------------|------------------------|---------------------------------------------------------------|----------------|
-| PAC      | Auto routing / direct/proxy | Omega, Clash           | Domain/IP routing      | Local: 127.0.0.1:21883/pac<br>Remote: pac.provider.com         | Traffic police |
-| Ad rules | Block ads / trackers        | uBlock Origin, AdGuard | Domain + path + hide   | Subscription link or in-extension rules                       | Cleaner        |
+| 项目     | 主要作用             | 常用工具                  | 能挡什么          | 路径例子                     | 比喻     |
+|----------|----------------------|---------------------------|-------------------|------------------------------|----------|
+| PAC     | 自动分流/直连    | Omega、Clash   | 域名/IP 分流     | 本地: 127.0.0.1:21883/pac<br>远程: pac.机场.com | 交通警察 |
+| 广告规则 | 杀广告/追踪器   | Origin、AdGuard    | 域名+路径+隐藏   | 订阅链接或插件内规则         | 清洁工   |
 
-PAC / ad-block rule list projects
 
-- [gfwlist/gfwlist](https://github.com/gfwlist/gfwlist)
-- [PaPerseller/chn-iplist](https://github.com/PaPerseller/chn-iplist)
-- [TG-Twilight/AWAvenue-Ads-Rule](https://github.com/TG-Twilight/AWAvenue-Ads-Rule)
+PAC、广告屏蔽文本文件相关项目
 
-**PAC (Proxy Auto-Config) rule markers**
+* [gfwlist/gfwlist](https://github.com/gfwlist/gfwlist)
+* [PaPerseller/chn-iplist](https://github.com/PaPerseller/chn-iplist)
+* [TG-Twilight/AWAvenue-Ads-Rule](https://github.com/TG-Twilight/AWAvenue-Ads-Rule)
 
-Rules **without** `@@` → **PROXY** (or **REJECT**, depending on the ruleset).
 
-Rules **with** `@@` → **DIRECT** (usually for domestic services).
+**PAC(Proxy auto-config) 主要符号含义**
 
-Example:
+无 `@@` 的规则 → **走代理**（翻墙）或 **REJECT**（广告/屏蔽）。
 
+有 `@@` 的规则 → **强制直连**（DIRECT，国内服务加速用）。
+
+示例：
 ```text
-! comment line / title
+! 这是一行注释，可做标题
 
-||google.com          # proxy
-.duckduckgo.com       # suffix match, proxy
-@@||baidu.com         # force direct
+||google.com          # 走代理（翻墙）
+.duckduckgo.com       # 同上，后缀匹配
+@@||baidu.com         # 强制直连（国内服务）
 ```
 
-**Ad-blocking rule markers (uBlock Origin / AdBlock Plus style)**
 
-Rules **without** `@@` → **BLOCK** (ads/trackers/popups, etc.).
+**广告屏蔽规则主要符号含义（uBlock Origin / AdBlock Plus 风格）**
 
-Rules **with** `@@` → **EXCEPTION / allowlist** (avoid false positives).
+无 `@@` 的规则 → **阻断 / 屏蔽**（挡掉广告、追踪器、弹窗等）。
 
-Example:
+有 `@@` 的规则 → **例外 / 白名单**（放过不挡，通常用于避免误伤正常内容）。
 
+示例：
 ```text
-! comment line / title
+! 这是一行注释，可做标题或说明
 
-||ads.google.com            # block this ad domain and subdomains
-.doubleclick.net            # suffix match
-@@||baidu.com               # exception: allow Baidu
-@@||*.aliyun.com^           # exception: allow all Aliyun domains
+||ads.google.com       # 阻断（挡掉这个广告域名及其子域的所有请求）
+.doubleclick.net      # 同上，后缀匹配（挡以 .doubleclick.net 结尾的域名）
+@@||baidu.com         # 例外（即使前面有匹配，也放过百度，不挡）
+@@||*.aliyun.com^     # 例外（阿里云相关域名全部放过）
 
-example.com##.ad-banner     # hide elements with class="ad-banner"
-example.com#@#.good-content # exception: do not hide class="good-content"
+example.com##.ad-banner       # 隐藏页面上 class="ad-banner" 的广告块
+example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的元素
 ```
 
-Mirrors can mitigate GitHub raw fetching issues, but may violate [GitHub ToS](https://github.com/site/terms).
+镜像可以缓解 GitHub 上原始文件获取导致的问题，这可能违反 [GitHub ToS](https://github.com/site/terms)
 
-## Recommended Hosts & DNS Lists
+## Hosts ＆ DNS 推荐列表
 
-**Hosts**
+**hosts**
 
-[jplopsoft - HOSTS Blocker common list description](https://jplop.neocities.org/teac_hosts_block)
+[jplopsoft - HOSTS Blocker常用列表說明](https://jplop.neocities.org/teac_hosts_block)
 
-- [ineo6/hosts](https://github.com/ineo6/hosts)
-- [StevenBlack/hosts](https://github.com/StevenBlack/hosts)
-- [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
-- [ignaciocastro/a-dove-is-dumb](https://github.com/ignaciocastro/a-dove-is-dumb)
+* [ineo6/hosts](https://github.com/ineo6/hosts)
+* [StevenBlack/hosts](https://github.com/StevenBlack/hosts)
+* [hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists)
 
 **DNS**
 
-[National Taiwan University CCNS – DNS server list](https://isms.ntu.edu.tw/DNSlist.html)
+[國立臺灣大學計算機及資訊網路中心 - DNS伺服器清單](https://isms.ntu.edu.tw/DNSlist.html)
 
-- [DNS SB](https://dns.sb)
-- [Next DNS](https://my.nextdns.io/a9bdef/setup)
-- [Quad9](https://quad9.net/)
-- [dolingou - Dns Servers Guide](https://www.dolingou.com/article/dns-servers-guide)
+* [DNS SB](https://dns.sb)
+* [Next DNS](https://my.nextdns.io/a9bdef/setup)
+* [Quad9](https://quad9.net/)
+* [dolingou - Dns Servers Guide](https://www.dolingou.com/article/dns-servers-guide)
 
-Recommended lightweight editors: [Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4)
+推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4) 
+
 
