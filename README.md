@@ -188,6 +188,6 @@ example.com#@#.good-content   # 例外：不要隐藏 class="good-content" 的�
 * [Quad9](https://quad9.net/)
 * [dolingou - Dns Servers Guide](https://www.dolingou.com/article/dns-servers-guide)
 
-推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4) 
+推荐轻量编辑器：[Kate](https://kate-editor.org/zh-cn/) + [Notepad4](https://github.com/zufuliu/notepad4)、[NotepadNext](https://github.com/dail8859/NotepadNext) 
 
 
